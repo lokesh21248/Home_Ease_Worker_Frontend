@@ -1,0 +1,50 @@
+import { NotificationItem } from '../types';
+
+export const mockNotifications: NotificationItem[] = [
+  {
+    id: 'notif-01',
+    title: '⚡ New Job Request Nearby',
+    body: 'Lokesh Reddy booked Full Home Deep Cleaning in Kukatpally (2.0 km away). Payout: ₹849.',
+    type: 'job',
+    timestamp: '5m ago',
+    isRead: false,
+    actionRoute: 'JobRequests',
+    jobId: 'c4d32e1a-8f90-4a12-b34c-9f8e7d6c5b4a',
+  },
+  {
+    id: 'notif-02',
+    title: '💰 Payout Credited to Wallet',
+    body: '₹1,020 has been credited for completed order #HE-8479 (Kitchen Sanitization).',
+    type: 'payment',
+    timestamp: '2h ago',
+    isRead: false,
+    actionRoute: 'Wallet',
+  },
+  {
+    id: 'notif-03',
+    title: '✅ Aadhaar & PAN Approved',
+    body: 'Congratulations! Your identity documents have been verified and approved by the HomeEase compliance team.',
+    type: 'document',
+    timestamp: '1d ago',
+    isRead: true,
+    actionRoute: 'DocumentUpload',
+  },
+  {
+    id: 'notif-04',
+    title: '🎁 Weekend Surge Bonus Activated',
+    body: 'Complete 6 service orders this Saturday & Sunday to earn an extra ₹1,200 guaranteed bonus.',
+    type: 'offer',
+    timestamp: '2d ago',
+    isRead: true,
+    actionRoute: 'Earnings',
+  },
+  {
+    id: 'notif-05',
+    title: '🛡️ Safety & Equipment Check',
+    body: 'Please ensure you carry fresh disposable shoe covers and standardized brand ID badge on all jobs.',
+    type: 'system',
+    timestamp: '4d ago',
+    isRead: true,
+    actionRoute: 'Support',
+  },
+];
