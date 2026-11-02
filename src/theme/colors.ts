@@ -1,88 +1,57 @@
+/**
+ * HomeEase Worker - Blue & White Theme Palette
+ * Inspired by Urban Company, premium fintech apps & clean Apple-style UI.
+ * Strictly adheres to the #2454D6 primary blue & white color system.
+ */
+
 export const colors = {
-  // Primary Royal Blue Palette (Partner / Worker Professional)
-  primary: '#1E40AF',        // Rich Navy Blue
-  primaryDark: '#172554',    // Midnight Blue
-  primaryLight: '#3B82F6',   // Bright Electric Blue
-  primaryLighter: '#EFF6FF', // Soft Ice Blue
-  primarySoft: '#DBEAFE',    // Tinted Blue
+  // Brand Blue System
+  primary: '#2454D6',         // Primary Blue
+  primaryDark: '#173B8F',
+  secondary: '#173B8F',     // Dark Blue (Headers, active states, deep contrast)
+  primaryLight: '#4475F2',    // Lighter Blue (Highlights, focused elements)
+  primarySoft: '#EFF4FE',     // Ultra Soft Blue (Card accents, active pill backgrounds)
+  primaryLighter: '#F0F5FE',  // Light Blue tint
 
-  // Accent & Status Colors
-  secondary: '#0D9488',      // Teal Green
-  accent: '#F59E0B',         // Amber Gold for ratings and incentives
-  success: '#10B981',        // Emerald Green (Accepted / Completed / Earnings)
-  successLight: '#ECFDF5',
-  warning: '#F59E0B',        // Amber (Pending / Notice)
-  warningLight: '#FFFBEB',
-  danger: '#EF4444',         // Crimson Red (Rejected / Cancellation)
-  dangerLight: '#FEF2F2',
-  info: '#0284C7',           // Sky Blue
-  infoLight: '#F0F9FF',
-
-  // Neutrals & Surfaces (White background requirement)
-  background: '#F8FAFC',     // Clean Off-White App Background
-  surface: '#FFFFFF',        // Card Background
-  surfaceAlt: '#F1F5F9',     // Input Background / Pill background
+  // Neutral Backgrounds & Cards
+  background: '#F5F8FE',      // Clean Premium App Background
+  surface: '#FFFFFF',         // Card & Sheet Background
+  card: '#FFFFFF',            // Explicit Card alias
+  surfaceAlt: '#F0F4FC',      // Input & Pill secondary background
   surfaceElevated: '#FFFFFF',
 
-  // Borders & Dividers
-  border: '#E2E8F0',
-  borderLight: '#F1F5F9',
-  borderDark: '#CBD5E1',
-
   // Typography
-  textPrimary: '#0F172A',    // Slate 900
-  textSecondary: '#475569',  // Slate 600
-  textMuted: '#94A3B8',      // Slate 400
-  textInverse: '#FFFFFF',    // White
-  textPrimaryBlue: '#1D4ED8',
+  textPrimary: '#17243A',     // Primary Text (High contrast dark navy/slate)
+  textSecondary: '#718096',   // Secondary Text (Muted subtitle / caption)
+  textMuted: '#A0AEC0',       // Inactive icons & placeholders
+  textInverse: '#FFFFFF',     // White text on dark/blue buttons
+  textPrimaryBlue: '#2454D6', // Blue accented text
 
-  // Shadow / Overlay
-  shadow: '#0F172A',
-  overlay: 'rgba(15, 23, 42, 0.65)',
+  // Borders & Dividers
+  border: '#E5EAF2',          // Subtle card & item borders
+  borderLight: '#EDF2F9',     // Thin divider lines
+  borderDark: '#CBD5E1',      // Input focus borders
 
-  // Brand Accents
-  onlineGreen: '#22C55E',
-  offlineGray: '#94A3B8',
-  starGold: '#FBBF24',
+  // Status & Functional Accents (Subtle and harmonious with blue palette)
+  success: '#10B981',         // Verified, Completed, Accepted
+  successLight: '#ECFDF5',    // Soft green tint
+  warning: '#F59E0B',         // Pending, OTP, Warning
+  warningLight: '#FFFBEB',    // Soft amber tint
+  danger: '#EF4444',          // Rejected, Cancelled, Errors
+  dangerLight: '#FEF2F2',     // Soft red tint
+  info: '#2454D6',            // Information (uses primary blue)
+  infoLight: '#EFF4FE',
+
+  // Shadows & Overlays
+  shadow: '#17243A',
+  overlay: 'rgba(23, 36, 58, 0.60)',
+
+  // Legacy mappings for backward compatibility
+  onlineGreen: '#10B981',
+  offlineGray: '#718096',
+  starGold: '#F59E0B',
+  accent: '#2454D6',
 };
 
-export const darkColors = {
-  primary: '#3B82F6',
-  primaryDark: '#1E3A8A',
-  primaryLight: '#60A5FA',
-  primaryLighter: '#1E293B',
-  primarySoft: '#1E293B',
-
-  secondary: '#14B8A6',
-  accent: '#FBBF24',
-  success: '#34D399',
-  successLight: '#064E3B',
-  warning: '#FBBF24',
-  warningLight: '#451A03',
-  danger: '#F87171',
-  dangerLight: '#450A0A',
-  info: '#38BDF8',
-  infoLight: '#082F49',
-
-  background: '#0B1120',
-  surface: '#1E293B',
-  surfaceAlt: '#334155',
-  surfaceElevated: '#1E293B',
-
-  border: '#334155',
-  borderLight: '#1E293B',
-  borderDark: '#475569',
-
-  textPrimary: '#F8FAFC',
-  textSecondary: '#94A3B8',
-  textMuted: '#64748B',
-  textInverse: '#0F172A',
-  textPrimaryBlue: '#60A5FA',
-
-  shadow: '#000000',
-  overlay: 'rgba(0, 0, 0, 0.75)',
-
-  onlineGreen: '#4ADE80',
-  offlineGray: '#64748B',
-  starGold: '#FBBF24',
-};
+export const darkColors = colors; // Keep consistent blue-and-white theme
+export default colors;

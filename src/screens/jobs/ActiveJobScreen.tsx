@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   Image,
   TouchableOpacity,
@@ -11,6 +10,7 @@ import {
   Modal,
   TextInput,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../../navigation/types';
@@ -18,46 +18,43 @@ import { Job, JobStatus } from '../../types';
 import { colors } from '../../theme/colors';
 import { borderRadius, shadows, spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-import Header from '../../components/Header';
-import Button from '../../components/Button';
-import Badge from '../../components/Badge';
+import { CustomHeader } from '../../components/CustomHeader';
+import { PremiumCard } from '../../components/PremiumCard';
+import { PrimaryButton } from '../../components/PrimaryButton';
+import { SecondaryButton } from '../../components/SecondaryButton';
+import { EmptyState } from '../../components/EmptyState';
 import { useApp } from '../../state/AppContext';
 import { openTurnByTurnNavigation } from '../../utils/navigationHelper';
 import { resolveBookingUuid } from '../../utils/uuid';
-import { mockJobs } from '../../mock/jobs';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ActiveJob'>;
 
-const STATUS_STEPS: { key: JobStatus; label: string; icon: string }[] = [
-  { key: 'accepted', label: 'Accepted', icon: 'checkmark-circle' },
-  { key: 'travelling', label: 'Travelling', icon: 'bicycle' },
-  { key: 'arrived', label: 'Arrived', icon: 'location' },
-  { key: 'started', label: 'In Progress', icon: 'timer' },
-  { key: 'completed', label: 'Completed', icon: 'shield-checkmark' },
+const STATUS_STEPS: { key: JobStatus; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { key: 'accepted', label: 'Accepted', icon: 'checkmark-circle-outline' },
+  { key: 'travelling', label: 'Travelling', icon: 'bicycle-outline' },
+  { key: 'arrived', label: 'Arrived', icon: 'location-outline' },
+  { key: 'started', label: 'In Progress', icon: 'timer-outline' },
+  { key: 'completed', label: 'Completed', icon: 'shield-checkmark-outline' },
 ];
 
 export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
   const initialJob = route.params?.job;
   const { activeJob, updateJobStatus, services, verifyJobPin, addSubServiceToJob } = useApp();
 
-  const currentJob: Job =
-    activeJob ||
-    initialJob ||
-    mockJobs.find((j) => j.bookingId === (route.params as any)?.bookingId) ||
-    mockJobs[0];
+  const currentJob: Job | null = activeJob || initialJob || null;
 
   // Live Stopwatch timer
-  const [secondsElapsed, setSecondsElapsed] = useState<number>(1420);
+  const [secondsElapsed, setSecondsElapsed] = useState<number>(0);
   const [isTimerRunning, setIsTimerRunning] = useState<boolean>(
-    currentJob.status === 'started'
+    currentJob?.status === 'started'
   );
 
-  // 4-Digit Doorstep Security PIN Verification (POST /workers/bookings/{id}/verify-pin)
+  // 4-Digit Doorstep Security PIN Verification
   const [isPinModalOpen, setIsPinModalOpen] = useState<boolean>(false);
-  const [pinDigits, setPinDigits] = useState<string[]>(['4', '8', '2', '1']);
+  const [pinDigits, setPinDigits] = useState<string[]>(['', '', '', '']);
   const [pinError, setPinError] = useState<string>('');
 
-  // Extra Sub-Service Upsell Modal (POST /workers/bookings/{id}/add-sub-service)
+  // Extra Sub-Service Upsell Modal
   const [isUpsellModalOpen, setIsUpsellModalOpen] = useState<boolean>(false);
   const [selectedSubServiceId, setSelectedSubServiceId] = useState<string>(
     'aa6fa960-d2fd-4cd6-8ed1-730d1e1a1cf0'
@@ -66,9 +63,9 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
 
   // Service checklist items
   const [checklist, setChecklist] = useState([
-    { id: 1, title: 'Identity & Safety Mask Verification', done: true },
+    { id: 1, title: 'Identity & Safety Verification', done: true },
     { id: 2, title: 'Pre-service Inspection & Photo capture', done: true },
-    { id: 3, title: 'Deep Service Execution & Treatment', done: currentJob.status === 'started' },
+    { id: 3, title: 'Deep Service Execution & Treatment', done: currentJob?.status === 'started' },
     { id: 4, title: 'Post-service Area Cleanup & Polish', done: false },
     { id: 5, title: 'Customer Satisfaction Review & Sign-off', done: false },
   ]);
@@ -99,7 +96,6 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   const handleStartJob = () => {
-    // Open Customer Doorstep 4-digit PIN verification modal
     setPinError('');
     setIsPinModalOpen(true);
   };
@@ -113,8 +109,6 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
 
     setPinError('');
 
-    // ✅ Pass the real Booking UUID: Always use the bookingId from the accepted dispatch (e.g. c4d32e1a-8f90-4a12-b34c-9f8e7d6c5b4a)
-    // Ensures local mock strings (like 'job-req-003') never leak into backend API routes
     const activeBookingId = resolveBookingUuid(
       (route.params as any)?.bookingId,
       (route.params as any)?.booking?.bookingId,
@@ -147,32 +141,58 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   const handleCompleteJob = () => {
-    navigation.navigate('JobCompletion', { job: currentJob });
+    if (currentJob) {
+      navigation.navigate('JobCompletion', { job: currentJob });
+    }
   };
 
   const getStepIndex = (status: JobStatus) => {
     return STATUS_STEPS.findIndex((s) => s.key === status);
   };
 
-  const currentStepIdx = getStepIndex(currentJob.status);
+  const currentStepIdx = currentJob ? getStepIndex(currentJob.status) : 0;
+
+  if (!currentJob) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <CustomHeader
+          title="Active Job"
+          showBack
+          onBack={() => navigation.navigate('MainTabs', { screen: 'HomeTab' })}
+        />
+        <EmptyState
+          icon="briefcase-outline"
+          title="No Active Job in Progress"
+          description="Accept an incoming service request from your dashboard to view active details and live navigation here."
+          actionLabel="Go to Dashboard"
+          onAction={() => navigation.navigate('MainTabs', { screen: 'HomeTab' })}
+        />
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header
-        title={`Active Job ${currentJob.jobId}`}
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Top Header */}
+      <CustomHeader
+        title={`Active Job #${currentJob.jobId}`}
         subtitle={currentJob.serviceName}
         showBack
         onBack={() => navigation.navigate('MainTabs', { screen: 'HomeTab' })}
       />
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Status Stepper Tracker */}
-        <View style={styles.card}>
-          <Text style={styles.sectionHeader}>Service Progression Flow</Text>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Progression Stepper */}
+        <PremiumCard style={styles.card}>
+          <Text style={styles.cardTitle}>Service Progression</Text>
           <View style={styles.stepperRow}>
             {STATUS_STEPS.map((step, idx) => {
               const isPast = idx < currentStepIdx;
               const isCurrent = idx === currentStepIdx;
+              const isActive = isCurrent || isPast;
 
               return (
                 <React.Fragment key={step.key}>
@@ -180,22 +200,20 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
                     <View
                       style={[
                         styles.stepDot,
-                        isPast && styles.stepDotPast,
+                        isActive && styles.stepDotActive,
                         isCurrent && styles.stepDotCurrent,
                       ]}
                     >
                       <Ionicons
-                        name={step.icon as any}
+                        name={step.icon}
                         size={14}
-                        color={
-                          isCurrent || isPast ? colors.textInverse : colors.textMuted
-                        }
+                        color={isActive ? '#FFFFFF' : colors.textSecondary}
                       />
                     </View>
                     <Text
                       style={[
                         styles.stepLabel,
-                        (isCurrent || isPast) && styles.stepLabelActive,
+                        isActive && styles.stepLabelActive,
                       ]}
                       numberOfLines={1}
                     >
@@ -214,13 +232,18 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
               );
             })}
           </View>
-        </View>
+        </PremiumCard>
 
-        {/* Live Timer Card (When started) */}
-        <View style={styles.timerCard}>
+        {/* Live Stopwatch Card */}
+        <PremiumCard style={styles.timerCard}>
           <View style={styles.timerHeaderRow}>
             <View style={styles.timerPill}>
-              <View style={styles.recordingPulse} />
+              <View
+                style={[
+                  styles.recordingPulse,
+                  currentJob.status === 'started' && styles.pulseActive,
+                ]}
+              />
               <Text style={styles.timerPillText}>
                 {currentJob.status === 'started' ? 'LIVE ON SITE' : 'STANDBY'}
               </Text>
@@ -235,24 +258,33 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
 
           <View style={styles.timelineDetailsRow}>
             <View style={styles.timelineCol}>
-              <Text style={styles.timelineLbl}>Accepted At</Text>
+              <Text style={styles.timelineLbl}>Accepted</Text>
               <Text style={styles.timelineVal}>{currentJob.timeline.acceptedAt || '09:15 AM'}</Text>
             </View>
+            <View style={styles.timelineDivider} />
             <View style={styles.timelineCol}>
-              <Text style={styles.timelineLbl}>Arrived At</Text>
+              <Text style={styles.timelineLbl}>Arrived</Text>
               <Text style={styles.timelineVal}>{currentJob.timeline.arrivedAt || '09:50 AM'}</Text>
             </View>
+            <View style={styles.timelineDivider} />
             <View style={styles.timelineCol}>
-              <Text style={styles.timelineLbl}>Started At</Text>
+              <Text style={styles.timelineLbl}>Started</Text>
               <Text style={styles.timelineVal}>{currentJob.timeline.startedAt || '10:05 AM'}</Text>
             </View>
           </View>
-        </View>
+        </PremiumCard>
 
         {/* Customer Card with Call & Address */}
-        <View style={styles.card}>
+        <PremiumCard style={styles.card}>
           <View style={styles.customerRow}>
-            <Image source={{ uri: currentJob.customer.avatar }} style={styles.avatar} />
+            <Image
+              source={{
+                uri:
+                  currentJob.customer.avatar ||
+                  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+              }}
+              style={styles.avatar}
+            />
             <View style={styles.customerMeta}>
               <Text style={styles.customerName}>{currentJob.customer.name}</Text>
               <Text style={styles.customerPhone}>{currentJob.customer.phone}</Text>
@@ -266,15 +298,15 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
               activeOpacity={0.8}
               onPress={() => Alert.alert('Calling Customer', `Dialing ${currentJob.customer.phone}`)}
             >
-              <Ionicons name="call" size={20} color={colors.primary} />
+              <Ionicons name="call-outline" size={20} color={colors.primary} />
             </TouchableOpacity>
           </View>
 
-          {/* 1-Tap Turn-by-Turn GPS Navigation Launchers */}
+          {/* Turn-by-Turn GPS Navigation Launcher */}
           <View style={styles.navRowWrapper}>
             <TouchableOpacity
               style={styles.primaryNavBtn}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
               onPress={() =>
                 openTurnByTurnNavigation({
                   latitude: currentJob.location.latitude,
@@ -284,33 +316,35 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
                 })
               }
             >
-              <Ionicons name="navigate" size={18} color={colors.textInverse} />
+              <Ionicons name="navigate-circle-outline" size={20} color="#FFFFFF" />
               <Text style={styles.primaryNavBtnText}>
                 Turn-by-Turn GPS ({currentJob.location.distanceKm} km)
               </Text>
-              <Ionicons name="open-outline" size={16} color={colors.textInverse} />
+              <Ionicons name="open-outline" size={16} color="#FFFFFF" />
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.secondaryNavBtn}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
               onPress={() => navigation.navigate('NavigationTracking', { job: currentJob })}
             >
-              <Ionicons name="map-outline" size={18} color={colors.primary} />
+              <Ionicons name="map-outline" size={20} color={colors.primary} />
             </TouchableOpacity>
           </View>
-        </View>
+        </PremiumCard>
 
         {/* Service Standard Checklist */}
-        <View style={styles.card}>
+        <PremiumCard style={styles.card}>
           <View style={styles.checklistHeaderRow}>
-            <Text style={styles.sectionHeader}>Service SOP Checklist</Text>
-            <Text style={styles.completedCount}>
-              {checklist.filter((i) => i.done).length}/{checklist.length} Completed
-            </Text>
+            <Text style={styles.cardTitle}>Service SOP Checklist</Text>
+            <View style={styles.completedCountPill}>
+              <Text style={styles.completedCountText}>
+                {checklist.filter((i) => i.done).length}/{checklist.length} Done
+              </Text>
+            </View>
           </View>
           <Text style={styles.checklistSub}>
-            Tap items as you complete them to maintain 5-star partner compliance:
+            Complete each step to maintain 5-star partner compliance:
           </Text>
 
           {checklist.map((item) => (
@@ -320,10 +354,8 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
               activeOpacity={0.7}
               onPress={() => toggleChecklistItem(item.id)}
             >
-              <View
-                style={[styles.checkbox, item.done && styles.checkboxDone]}
-              >
-                {item.done && <Ionicons name="checkmark" size={14} color={colors.textInverse} />}
+              <View style={[styles.checkbox, item.done && styles.checkboxDone]}>
+                {item.done && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
               </View>
               <Text
                 style={[
@@ -335,18 +367,20 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
               </Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </PremiumCard>
 
         {/* Added Extra Sub-Services (Upsells) Card */}
         {currentJob.subServices && currentJob.subServices.length > 0 && (
-          <View style={styles.card}>
+          <PremiumCard style={styles.card}>
             <View style={styles.checklistHeaderRow}>
-              <Text style={styles.sectionHeader}>On-Site Added Sub-Services</Text>
-              <Badge label="Upsell Active" variant="success" size="sm" />
+              <Text style={styles.cardTitle}>On-Site Added Add-ons</Text>
+              <View style={styles.badgePill}>
+                <Text style={styles.badgePillText}>Add-on Active</Text>
+              </View>
             </View>
             {currentJob.subServices.map((sub, idx) => (
               <View key={idx} style={styles.extraServiceItem}>
-                <Ionicons name="add-circle" size={18} color={colors.success} />
+                <Ionicons name="add-circle-outline" size={18} color={colors.primary} />
                 <View style={{ flex: 1, marginLeft: spacing.sm }}>
                   <Text style={styles.extraServiceName}>{sub.name}</Text>
                   <Text style={styles.extraServiceQty}>Qty: {sub.quantity} × ₹{sub.price}</Text>
@@ -354,17 +388,19 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
                 <Text style={styles.extraServiceAmount}>+₹{sub.quantity * sub.price}</Text>
               </View>
             ))}
-          </View>
+          </PremiumCard>
         )}
 
-        {/* Upsell Trigger Button when job is in progress */}
+        {/* Upsell Trigger Card when in progress */}
         {currentJob.status === 'started' && (
-          <View style={styles.upsellActionCard}>
+          <PremiumCard style={styles.upsellActionCard}>
             <View style={styles.upsellLeft}>
-              <Ionicons name="sparkles" size={20} color={colors.accent} />
-              <View style={{ marginLeft: spacing.sm }}>
+              <View style={styles.upsellIconWrap}>
+                <Ionicons name="sparkles-outline" size={20} color={colors.primary} />
+              </View>
+              <View style={{ marginLeft: spacing.sm, flex: 1 }}>
                 <Text style={styles.upsellCardTitle}>Customer Needs Extra Repairs?</Text>
-                <Text style={styles.upsellCardSub}>Add sub-services directly to this booking invoice</Text>
+                <Text style={styles.upsellCardSub}>Add sub-services directly to this invoice</Text>
               </View>
             </View>
             <TouchableOpacity
@@ -372,41 +408,40 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
               activeOpacity={0.8}
               onPress={() => setIsUpsellModalOpen(true)}
             >
-              <Ionicons name="add" size={16} color={colors.textInverse} />
+              <Ionicons name="add" size={16} color="#FFFFFF" />
               <Text style={styles.addUpsellBtnText}>Add Service</Text>
             </TouchableOpacity>
-          </View>
+          </PremiumCard>
         )}
       </ScrollView>
 
       {/* Action Footer */}
       <View style={styles.footer}>
         {currentJob.status !== 'started' ? (
-          <Button
-            title="Verify Doorstep PIN & Start ⏱️"
-            variant="primary"
+          <PrimaryButton
+            title="Verify Doorstep PIN & Start"
             size="lg"
             fullWidth
             onPress={handleStartJob}
+            icon={<Ionicons name="keypad-outline" size={20} color="#FFFFFF" />}
           />
         ) : (
-          <Button
-            title="Complete Job & Upload Proofs 📸"
-            variant="success"
+          <PrimaryButton
+            title="Complete Job & Upload Proofs"
             size="lg"
             fullWidth
             onPress={handleCompleteJob}
-            icon={<Ionicons name="checkmark-done" size={20} color={colors.textInverse} />}
+            icon={<Ionicons name="checkmark-done-outline" size={20} color="#FFFFFF" />}
           />
         )}
       </View>
 
-      {/* 4-Digit Customer PIN Verification Modal (POST /workers/bookings/{id}/verify-pin) */}
+      {/* 4-Digit Doorstep Security PIN Modal */}
       <Modal visible={isPinModalOpen} transparent animationType="fade">
         <View style={styles.modalBackdrop}>
           <View style={styles.pinModalCard}>
             <View style={styles.pinModalIconCircle}>
-              <Ionicons name="keypad" size={28} color={colors.primary} />
+              <Ionicons name="keypad-outline" size={28} color={colors.primary} />
             </View>
 
             <Text style={styles.pinModalTitle}>Enter Customer PIN</Text>
@@ -443,49 +478,52 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
               <Text style={styles.pinErrorText}>{pinError}</Text>
             ) : (
               <View style={styles.demoPinNotice}>
-                <Ionicons name="shield-checkmark" size={14} color={colors.success} />
+                <Ionicons name="shield-checkmark-outline" size={14} color={colors.primary} />
                 <Text style={styles.demoPinNoticeText}>
-                  Default Customer Security PIN: {currentJob.pinCode || '4821'}
+                  Customer Security PIN: {currentJob.pinCode || '4821'}
                 </Text>
               </View>
             )}
 
-            <Button
+            <PrimaryButton
               title="Verify PIN & Unlock Job"
-              variant="primary"
               size="lg"
               fullWidth
               onPress={handleVerifyPinSubmit}
               style={{ marginTop: spacing.md }}
             />
 
-            <TouchableOpacity
+            <SecondaryButton
+              title="Cancel"
+              size="md"
+              fullWidth
+              variant="subtle"
               onPress={() => setIsPinModalOpen(false)}
-              style={styles.cancelBtn}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.cancelBtnText}>Cancel</Text>
-            </TouchableOpacity>
+              style={{ marginTop: spacing.xs }}
+            />
           </View>
         </View>
       </Modal>
 
-      {/* Extra Sub-Service Upsell Modal (POST /workers/bookings/{id}/add-sub-service) */}
+      {/* Extra Sub-Service Upsell Modal */}
       <Modal visible={isUpsellModalOpen} transparent animationType="slide">
         <View style={styles.modalBackdrop}>
           <View style={styles.upsellModalCard}>
             <View style={styles.upsellModalHeader}>
               <View>
-                <Text style={styles.upsellModalTitle}>Add Extra Sub-Service</Text>
+                <Text style={styles.upsellModalTitle}>Add Extra Service</Text>
                 <Text style={styles.upsellModalSubtitle}>On-site customer upsell request</Text>
               </View>
-              <TouchableOpacity onPress={() => setIsUpsellModalOpen(false)}>
-                <Ionicons name="close" size={24} color={colors.textSecondary} />
+              <TouchableOpacity
+                onPress={() => setIsUpsellModalOpen(false)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="close" size={22} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
             <Text style={styles.upsellSubLabel}>Select Service Add-On:</Text>
-            <ScrollView style={{ maxHeight: 240 }} showsVerticalScrollIndicator={false}>
+            <ScrollView style={{ maxHeight: 220 }} showsVerticalScrollIndicator={false}>
               {services
                 .flatMap((cat) => cat.subServices || [])
                 .map((sub) => {
@@ -509,11 +547,18 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
                         >
                           {sub.name}
                         </Text>
-                        {sub.description && (
+                        {sub.description ? (
                           <Text style={styles.subServiceSelectDesc}>{sub.description}</Text>
-                        )}
+                        ) : null}
                       </View>
-                      <Text style={styles.subServiceSelectPrice}>₹{sub.price}</Text>
+                      <Text
+                        style={[
+                          styles.subServiceSelectPrice,
+                          isSelected && styles.subServiceSelectPriceActive,
+                        ]}
+                      >
+                        ₹{sub.price}
+                      </Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -539,13 +584,12 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
               </View>
             </View>
 
-            <Button
+            <PrimaryButton
               title="Add Extra Service to Booking"
-              variant="success"
               size="lg"
               fullWidth
               onPress={handleConfirmUpsell}
-              style={{ marginTop: spacing.lg }}
+              style={{ marginTop: spacing.md }}
             />
           </View>
         </View>
@@ -560,22 +604,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   scrollContent: {
-    padding: spacing.lg,
+    padding: spacing.md,
     paddingBottom: spacing.xxl,
   },
   card: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
     marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    ...shadows.sm,
   },
-  sectionHeader: {
-    ...typography.subtitle1,
-    color: colors.textPrimary,
+  cardTitle: {
+    fontSize: 15,
     fontWeight: '700',
+    color: colors.textPrimary,
     marginBottom: spacing.md,
   },
   stepperRow: {
@@ -586,35 +624,34 @@ const styles = StyleSheet.create({
   },
   stepItem: {
     alignItems: 'center',
-    width: 52,
   },
   stepDot: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1.5,
+    backgroundColor: colors.background,
+    borderWidth: 1,
     borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,
   },
-  stepDotPast: {
+  stepDotActive: {
     backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
   stepDotCurrent: {
-    backgroundColor: colors.success,
-    borderColor: colors.success,
+    borderWidth: 2,
+    borderColor: colors.secondary,
   },
   stepLabel: {
-    ...typography.caption,
-    fontSize: 9,
-    color: colors.textMuted,
+    fontSize: 10,
+    fontWeight: '600',
+    color: colors.textSecondary,
     textAlign: 'center',
   },
   stepLabelActive: {
-    color: colors.textPrimary,
+    color: colors.primary,
     fontWeight: '700',
   },
   stepLine: {
@@ -622,88 +659,92 @@ const styles = StyleSheet.create({
     height: 2,
     backgroundColor: colors.border,
     marginBottom: 16,
+    marginHorizontal: 2,
   },
   stepLineActive: {
     backgroundColor: colors.primary,
   },
   timerCard: {
-    backgroundColor: '#0F172A',
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
     marginBottom: spacing.md,
-    ...shadows.md,
+    backgroundColor: '#FFFFFF',
+    borderColor: colors.border,
   },
   timerHeaderRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.md,
+    alignItems: 'center',
+    marginBottom: spacing.sm,
   },
   timerPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1E293B',
-    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: borderRadius.full,
+    gap: 6,
   },
   recordingPulse: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#EF4444',
-    marginRight: 6,
+    backgroundColor: colors.textSecondary,
+  },
+  pulseActive: {
+    backgroundColor: colors.primary,
   },
   timerPillText: {
-    ...typography.caption,
-    color: '#F8FAFC',
-    fontWeight: '800',
-    fontSize: 10,
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.primary,
     letterSpacing: 0.5,
   },
   estDuration: {
-    ...typography.caption,
-    color: '#94A3B8',
-    fontWeight: '600',
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontWeight: '500',
   },
   timerDisplay: {
     alignItems: 'center',
-    marginVertical: spacing.sm,
+    paddingVertical: spacing.md,
   },
   timerDigits: {
-    fontSize: 48,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    fontVariant: ['tabular-nums'],
-    letterSpacing: 1,
+    fontSize: 40,
+    fontWeight: '800',
+    color: colors.primary,
+    letterSpacing: 1.5,
   },
   timerUnit: {
-    ...typography.caption,
-    color: '#94A3B8',
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontWeight: '500',
     marginTop: 2,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
   },
   timelineDetailsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: spacing.md,
-    paddingTop: spacing.md,
+    alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: '#334155',
+    borderTopColor: colors.border,
+    paddingTop: spacing.sm,
   },
   timelineCol: {
+    flex: 1,
     alignItems: 'center',
   },
+  timelineDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: colors.border,
+  },
   timelineLbl: {
-    ...typography.caption,
-    color: '#94A3B8',
-    fontSize: 10,
+    fontSize: 11,
+    color: colors.textSecondary,
   },
   timelineVal: {
-    ...typography.subtitle2,
-    color: '#F8FAFC',
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textPrimary,
     marginTop: 2,
   },
   customerRow: {
@@ -711,36 +752,66 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: colors.surfaceAlt,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.primaryLight,
   },
   customerMeta: {
     flex: 1,
     marginLeft: spacing.md,
   },
   customerName: {
-    ...typography.subtitle1,
+    fontSize: 15,
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   customerPhone: {
-    ...typography.caption,
-    color: colors.primary,
-    fontWeight: '700',
+    fontSize: 12,
+    color: colors.textSecondary,
     marginTop: 1,
   },
   addressText: {
-    ...typography.caption,
+    fontSize: 12,
     color: colors.textSecondary,
     marginTop: 2,
-    lineHeight: 14,
+    lineHeight: 16,
   },
   callCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.primaryLighter,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  navRowWrapper: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  primaryNavBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    paddingVertical: 12,
+    borderRadius: borderRadius.md,
+    gap: 8,
+  },
+  primaryNavBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  secondaryNavBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.primaryLight,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -748,277 +819,290 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: spacing.xs,
   },
-  completedCount: {
-    ...typography.caption,
+  completedCountPill: {
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: borderRadius.full,
+  },
+  completedCountText: {
+    fontSize: 11,
+    fontWeight: '700',
     color: colors.primary,
-    fontWeight: '800',
   },
   checklistSub: {
-    ...typography.caption,
+    fontSize: 12,
     color: colors.textSecondary,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   checklistItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.sm,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   checkbox: {
-    width: 22,
-    height: 22,
+    width: 20,
+    height: 20,
     borderRadius: 6,
     borderWidth: 1.5,
-    borderColor: colors.borderDark,
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.md,
+    marginRight: spacing.sm,
   },
   checkboxDone: {
-    backgroundColor: colors.success,
-    borderColor: colors.success,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   checklistText: {
-    ...typography.body2,
+    fontSize: 13,
     color: colors.textPrimary,
-    flex: 1,
   },
   checklistTextDone: {
-    color: colors.textMuted,
+    color: colors.textSecondary,
     textDecorationLine: 'line-through',
   },
-  footer: {
-    padding: spacing.lg,
-    backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: colors.overlay,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.xl,
-  },
-  pinModalCard: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
-    alignItems: 'center',
-    width: '100%',
-    ...shadows.lg,
-  },
-  pinModalIconCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: colors.primaryLighter,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.md,
-  },
-  pinModalTitle: {
-    ...typography.h2,
-    color: colors.textPrimary,
-  },
-  pinModalSubtitle: {
-    ...typography.body2,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginTop: spacing.xs,
-    marginBottom: spacing.lg,
-  },
-  pinBoxesRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: 220,
-    marginBottom: spacing.md,
-  },
-  pinDigitBox: {
-    width: 48,
-    height: 56,
-    borderRadius: borderRadius.md,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-    fontSize: 24,
-    fontWeight: '800',
-    color: colors.textPrimary,
-  },
-  pinDigitBoxFilled: {
-    borderColor: colors.primary,
-    backgroundColor: colors.surface,
-  },
-  pinDigitBoxError: {
-    borderColor: colors.danger,
-    backgroundColor: colors.dangerLight,
-  },
-  pinErrorText: {
-    ...typography.caption,
-    color: colors.danger,
-    textAlign: 'center',
-    marginTop: 4,
-  },
-  demoPinNotice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.successLight,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+  badgePill: {
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
     borderRadius: borderRadius.full,
-    marginTop: 2,
   },
-  demoPinNoticeText: {
-    ...typography.caption,
-    color: colors.success,
+  badgePillText: {
+    fontSize: 11,
     fontWeight: '700',
-    marginLeft: 4,
-  },
-  cancelBtn: {
-    paddingVertical: spacing.md,
-    marginTop: spacing.xs,
-  },
-  cancelBtnText: {
-    ...typography.body2,
-    color: colors.textSecondary,
-    fontWeight: '600',
+    color: colors.primary,
   },
   extraServiceItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.xs + 2,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
+    paddingVertical: 6,
   },
   extraServiceName: {
-    ...typography.subtitle2,
+    fontSize: 13,
+    fontWeight: '600',
     color: colors.textPrimary,
   },
   extraServiceQty: {
-    ...typography.caption,
+    fontSize: 11,
     color: colors.textSecondary,
   },
   extraServiceAmount: {
-    ...typography.subtitle2,
-    color: colors.success,
-    fontWeight: '800',
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primary,
   },
   upsellActionCard: {
+    marginBottom: spacing.md,
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.border,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.surface,
-    padding: spacing.md,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1.5,
-    borderColor: colors.accent,
-    marginBottom: spacing.lg,
-    ...shadows.sm,
   },
   upsellLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
+  upsellIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   upsellCardTitle: {
-    ...typography.subtitle2,
-    color: colors.textPrimary,
+    fontSize: 13,
     fontWeight: '700',
+    color: colors.textPrimary,
   },
   upsellCardSub: {
-    ...typography.caption,
+    fontSize: 11,
     color: colors.textSecondary,
-    fontSize: 10,
+    marginTop: 1,
   },
   addUpsellBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.primary,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 2,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: borderRadius.md,
-    marginLeft: spacing.sm,
+    gap: 4,
   },
   addUpsellBtnText: {
-    ...typography.caption,
-    color: colors.textInverse,
+    fontSize: 12,
     fontWeight: '700',
-    marginLeft: 2,
+    color: '#FFFFFF',
   },
-  upsellModalCard: {
-    backgroundColor: colors.surface,
+  footer: {
+    padding: spacing.md,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(23, 36, 58, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  pinModalCard: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
     borderRadius: borderRadius.xl,
     padding: spacing.xl,
+    alignItems: 'center',
+    ...shadows.md,
+  },
+  pinModalIconCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  pinModalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.textPrimary,
+  },
+  pinModalSubtitle: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 4,
+    marginBottom: spacing.lg,
+  },
+  pinBoxesRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
+  pinDigitBox: {
+    width: 52,
+    height: 56,
+    borderRadius: borderRadius.md,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    backgroundColor: colors.background,
+  },
+  pinDigitBoxFilled: {
+    borderColor: colors.primary,
+    backgroundColor: '#FFFFFF',
+  },
+  pinDigitBoxError: {
+    borderColor: colors.danger,
+  },
+  pinErrorText: {
+    fontSize: 12,
+    color: colors.danger,
+    marginBottom: spacing.sm,
+  },
+  demoPinNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: borderRadius.full,
+    marginBottom: spacing.md,
+  },
+  demoPinNoticeText: {
+    fontSize: 12,
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  upsellModalCard: {
     width: '100%',
-    maxHeight: '80%',
-    ...shadows.lg,
+    backgroundColor: '#FFFFFF',
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
+    ...shadows.md,
   },
   upsellModalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: spacing.md,
   },
   upsellModalTitle: {
-    ...typography.h3,
+    fontSize: 17,
+    fontWeight: '800',
     color: colors.textPrimary,
   },
   upsellModalSubtitle: {
-    ...typography.caption,
+    fontSize: 12,
     color: colors.textSecondary,
-    marginTop: 2,
+    marginTop: 1,
   },
   upsellSubLabel: {
-    ...typography.subtitle2,
+    fontSize: 13,
+    fontWeight: '600',
     color: colors.textPrimary,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
   },
   subServiceSelectCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: spacing.md,
-    backgroundColor: colors.surfaceAlt,
+    padding: spacing.sm + 2,
     borderRadius: borderRadius.md,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: colors.border,
-    marginBottom: spacing.xs + 2,
+    marginBottom: spacing.xs,
   },
   subServiceSelectCardActive: {
     borderColor: colors.primary,
-    backgroundColor: colors.primaryLighter,
+    backgroundColor: colors.primaryLight,
   },
   subServiceSelectName: {
-    ...typography.subtitle2,
+    fontSize: 13,
+    fontWeight: '600',
     color: colors.textPrimary,
   },
   subServiceSelectNameActive: {
     color: colors.primary,
-    fontWeight: '700',
   },
   subServiceSelectDesc: {
-    ...typography.caption,
+    fontSize: 11,
     color: colors.textSecondary,
-    fontSize: 10,
     marginTop: 2,
   },
   subServiceSelectPrice: {
-    ...typography.subtitle1,
-    color: colors.success,
-    fontWeight: '800',
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textPrimary,
     marginLeft: spacing.sm,
+  },
+  subServiceSelectPriceActive: {
+    color: colors.primary,
   },
   qtyRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginTop: spacing.md,
-    paddingTop: spacing.md,
+    paddingTop: spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
+    borderTopColor: colors.border,
   },
   qtyLabel: {
-    ...typography.subtitle2,
+    fontSize: 14,
+    fontWeight: '600',
     color: colors.textPrimary,
   },
   qtyControls: {
@@ -1030,51 +1114,16 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
     borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.background,
   },
   qtyValue: {
-    ...typography.subtitle1,
-    color: colors.textPrimary,
-    fontWeight: '800',
-  },
-  navRowWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.md,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
-  },
-  primaryNavBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.primary,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.md,
-    gap: spacing.sm,
-  },
-  primaryNavBtnText: {
-    ...typography.button,
-    color: colors.textInverse,
+    fontSize: 16,
     fontWeight: '700',
-  },
-  secondaryNavBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.primaryLighter,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
+    color: colors.textPrimary,
   },
 });
 

@@ -3,11 +3,11 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   Dimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,11 +15,10 @@ import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { borderRadius, shadows, spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-import Header from '../../components/Header';
-import Button from '../../components/Button';
+import { CustomHeader } from '../../components/CustomHeader';
+import { PremiumCard } from '../../components/PremiumCard';
+import { PrimaryButton } from '../../components/PrimaryButton';
 import { useApp } from '../../state/AppContext';
-
-const SCREEN_WIDTH = Dimensions.get('window').width;
 
 export const EarningsScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -27,7 +26,6 @@ export const EarningsScreen: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'Daily' | 'Weekly' | 'Monthly'>('Daily');
 
-  // End-to-end Backend Earnings Overview: GET /workers/earnings
   useEffect(() => {
     fetchEarningsOverview();
   }, []);
@@ -39,12 +37,12 @@ export const EarningsScreen: React.FC = () => {
       ? earnings.weekly
       : earnings.monthly;
 
-  // Calculate highest bar value for proportional height
   const maxAmount = Math.max(...currentData.chartBars.map((b) => b.amount), 100);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Top Header */}
+      <CustomHeader
         title="Earnings & Analytics"
         subtitle="Manage Services • Grow Your Earnings"
         rightAction={
@@ -53,34 +51,38 @@ export const EarningsScreen: React.FC = () => {
             onPress={() => navigation.navigate('Wallet')}
             activeOpacity={0.8}
           >
-            <Ionicons name="wallet-outline" size={18} color={colors.primary} />
+            <Ionicons name="wallet-outline" size={16} color={colors.primary} />
             <Text style={styles.walletHeaderBtnText}>₹{wallet.availableBalance.toLocaleString()}</Text>
           </TouchableOpacity>
         }
       />
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Period Selector Tabs */}
         <View style={styles.tabBar}>
-          {(['Daily', 'Weekly', 'Monthly'] as const).map((tab) => (
-            <TouchableOpacity
-              key={tab}
-              style={[styles.tabItem, activeTab === tab && styles.tabItemActive]}
-              onPress={() => setActiveTab(tab)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-                {tab}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {(['Daily', 'Weekly', 'Monthly'] as const).map((tab) => {
+            const isActive = activeTab === tab;
+            return (
+              <TouchableOpacity
+                key={tab}
+                style={[styles.tabItem, isActive && styles.tabItemActive]}
+                onPress={() => setActiveTab(tab)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
+                  {tab}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         {/* Hero Earnings Card */}
         <View style={styles.heroCard}>
-          <Text style={styles.heroSubText}>
-            Net Payout ({activeTab})
-          </Text>
+          <Text style={styles.heroSubText}>Net Payout ({activeTab})</Text>
           <Text style={styles.heroAmount}>
             ₹{currentData.netPayout.toLocaleString()}
           </Text>
@@ -93,22 +95,22 @@ export const EarningsScreen: React.FC = () => {
             <View style={styles.heroDivider} />
             <View style={styles.heroStatItem}>
               <Text style={styles.heroStatLabel}>Commission</Text>
-              <Text style={[styles.heroStatValue, { color: '#F87171' }]}>
+              <Text style={styles.heroStatValueDanger}>
                 - ₹{currentData.commission.toLocaleString()}
               </Text>
             </View>
             <View style={styles.heroDivider} />
             <View style={styles.heroStatItem}>
               <Text style={styles.heroStatLabel}>Incentives</Text>
-              <Text style={[styles.heroStatValue, { color: '#34D399' }]}>
+              <Text style={styles.heroStatValueSuccess}>
                 + ₹{currentData.incentives.toLocaleString()}
               </Text>
             </View>
           </View>
         </View>
 
-        {/* High-Fidelity Bar Chart Card */}
-        <View style={styles.card}>
+        {/* Earnings Trend Bar Chart Card */}
+        <PremiumCard style={styles.card}>
           <View style={styles.cardHeaderRow}>
             <View>
               <Text style={styles.cardTitle}>Earnings Trend</Text>
@@ -118,7 +120,7 @@ export const EarningsScreen: React.FC = () => {
             </View>
             <View style={styles.legendDotWrap}>
               <View style={styles.legendDot} />
-              <Text style={styles.legendText}>Take-home (₹)</Text>
+              <Text style={styles.legendText}>Take-Home (₹)</Text>
             </View>
           </View>
 
@@ -126,13 +128,13 @@ export const EarningsScreen: React.FC = () => {
           <View style={styles.chartContainer}>
             <View style={styles.barsRow}>
               {currentData.chartBars.map((bar, index) => {
-                const heightPercentage = Math.max(10, Math.round((bar.amount / maxAmount) * 100));
+                const heightPercentage = Math.max(12, Math.round((bar.amount / maxAmount) * 100));
 
                 return (
                   <View key={index} style={styles.barColumn}>
-                    {bar.amount > 0 && (
+                    {bar.amount > 0 ? (
                       <Text style={styles.barTopAmount}>₹{bar.amount}</Text>
-                    )}
+                    ) : null}
                     <View style={styles.barTrack}>
                       <View
                         style={[
@@ -148,10 +150,10 @@ export const EarningsScreen: React.FC = () => {
               })}
             </View>
           </View>
-        </View>
+        </PremiumCard>
 
-        {/* Category Contribution (Pie / Breakdown Distribution) */}
-        <View style={styles.card}>
+        {/* Service Category Breakdown Card */}
+        <PremiumCard style={styles.card}>
           <Text style={styles.cardTitle}>Trade Revenue Breakdown</Text>
           <Text style={styles.cardSubtitle}>Contribution across your service categories</Text>
 
@@ -162,7 +164,10 @@ export const EarningsScreen: React.FC = () => {
                 key={i}
                 style={[
                   styles.segmentPiece,
-                  { width: `${item.percentage}%`, backgroundColor: item.color },
+                  {
+                    width: `${item.percentage}%`,
+                    backgroundColor: i === 0 ? colors.primary : i === 1 ? colors.secondary : '#93C5FD',
+                  },
                 ]}
               />
             ))}
@@ -170,63 +175,64 @@ export const EarningsScreen: React.FC = () => {
 
           {/* Category Rows */}
           <View style={styles.breakdownList}>
-            {currentData.breakdown.map((item, i) => (
-              <View key={i} style={styles.breakdownRow}>
-                <View style={styles.breakdownLeft}>
-                  <View style={[styles.colorPill, { backgroundColor: item.color }]} />
-                  <Text style={styles.categoryName}>{item.serviceCategory}</Text>
-                </View>
+            {currentData.breakdown.map((item, i) => {
+              const segColor = i === 0 ? colors.primary : i === 1 ? colors.secondary : '#93C5FD';
+              return (
+                <View key={i} style={styles.breakdownRow}>
+                  <View style={styles.breakdownLeft}>
+                    <View style={[styles.colorPill, { backgroundColor: segColor }]} />
+                    <Text style={styles.categoryName}>{item.serviceCategory}</Text>
+                  </View>
 
-                <View style={styles.breakdownRight}>
-                  <Text style={styles.categoryAmount}>₹{item.amount.toLocaleString()}</Text>
-                  <Text style={styles.categoryPercent}>{item.percentage}%</Text>
+                  <View style={styles.breakdownRight}>
+                    <Text style={styles.categoryAmount}>₹{item.amount.toLocaleString()}</Text>
+                    <Text style={styles.categoryPercent}>{item.percentage}%</Text>
+                  </View>
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
-        </View>
+        </PremiumCard>
 
         {/* Recent Settled Orders */}
-        <View style={styles.card}>
+        <PremiumCard style={styles.card}>
           <View style={styles.cardHeaderRow}>
-            <Text style={styles.cardTitle}>Recent Orders in this Period</Text>
-            <Text style={styles.orderCountBadge}>{currentData.recentOrders.length} Orders</Text>
+            <Text style={styles.cardTitle}>Recent Settled Orders</Text>
+            <View style={styles.orderCountBadge}>
+              <Text style={styles.orderCountBadgeText}>
+                {currentData.recentOrders.length} Orders
+              </Text>
+            </View>
           </View>
 
-          {currentData.recentOrders.map((order) => (
-            <View key={order.id} style={styles.orderRow}>
-              <View style={styles.orderIconBox}>
-                <Ionicons name="receipt-outline" size={20} color={colors.primary} />
-              </View>
-
-              <View style={styles.orderCenter}>
-                <Text style={styles.orderJobId}>{order.jobId} • {order.customerName}</Text>
-                <Text style={styles.orderServiceName}>{order.serviceName}</Text>
-                <Text style={styles.orderDate}>{order.date}</Text>
-              </View>
-
-              <View style={styles.orderRight}>
-                <Text style={styles.orderAmount}>+ ₹{order.amount}</Text>
-                <View style={styles.settledBadge}>
-                  <Text style={styles.settledText}>{order.status}</Text>
+          {currentData.recentOrders.length > 0 ? (
+            currentData.recentOrders.map((order) => (
+              <View key={order.id} style={styles.orderRow}>
+                <View style={styles.orderIconBox}>
+                  <Ionicons name="receipt-outline" size={18} color={colors.primary} />
                 </View>
+                <View style={{ flex: 1, marginLeft: spacing.sm }}>
+                  <Text style={styles.orderCategory}>{order.serviceName}</Text>
+                  <Text style={styles.orderTime}>{order.date} • Order #{order.jobId || order.id}</Text>
+                </View>
+                <Text style={styles.orderAmount}>+₹{order.amount}</Text>
               </View>
-            </View>
-          ))}
-        </View>
-      </ScrollView>
+            ))
+          ) : (
+            <Text style={styles.emptyOrdersText}>No settled orders in this period.</Text>
+          )}
+        </PremiumCard>
 
-      {/* Wallet Withdraw Shortcut Footer */}
-      <View style={styles.footer}>
-        <Button
-          title={`Open Wallet & Withdraw (₹${wallet.availableBalance.toLocaleString()})`}
-          variant="primary"
+        {/* Quick Bank & Wallet CTA */}
+        <PrimaryButton
+          title="Manage Wallet & Withdrawals"
           size="lg"
           fullWidth
           onPress={() => navigation.navigate('Wallet')}
-          icon={<Ionicons name="wallet" size={18} color={colors.textInverse} />}
+          icon={<Ionicons name="wallet-outline" size={20} color="#FFFFFF" />}
+          style={{ marginTop: spacing.xs, marginBottom: spacing.lg }}
         />
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -236,151 +242,152 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  scrollContent: {
+    padding: spacing.md,
+    paddingBottom: spacing.xxl,
+  },
   walletHeaderBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.primaryLighter,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 2,
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 6,
     borderRadius: borderRadius.full,
-    borderWidth: 1,
-    borderColor: colors.primarySoft,
+    gap: 4,
   },
   walletHeaderBtnText: {
-    ...typography.caption,
+    fontSize: 13,
+    fontWeight: '700',
     color: colors.primary,
-    fontWeight: '800',
-    marginLeft: 4,
-  },
-  scrollContent: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xxl,
   },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: borderRadius.md,
+    backgroundColor: '#FFFFFF',
+    borderRadius: borderRadius.full,
     padding: 4,
-    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.md,
   },
   tabItem: {
     flex: 1,
-    paddingVertical: spacing.sm,
+    paddingVertical: 8,
     alignItems: 'center',
-    borderRadius: borderRadius.sm,
+    borderRadius: borderRadius.full,
   },
   tabItemActive: {
-    backgroundColor: colors.surface,
-    ...shadows.sm,
+    backgroundColor: colors.primary,
   },
   tabText: {
-    ...typography.caption,
+    fontSize: 13,
+    fontWeight: '600',
     color: colors.textSecondary,
-    fontWeight: '700',
   },
   tabTextActive: {
-    color: colors.primary,
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
   heroCard: {
-    backgroundColor: colors.primaryDark,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
-    marginBottom: spacing.lg,
-    ...shadows.md,
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+    ...shadows.sm,
   },
   heroSubText: {
-    ...typography.caption,
-    color: '#93C5FD',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '600',
   },
   heroAmount: {
-    fontSize: 38,
+    fontSize: 34,
     fontWeight: '900',
     color: '#FFFFFF',
-    marginVertical: spacing.xs,
+    marginVertical: 4,
   },
   heroStatsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#1E293B',
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
+    alignItems: 'center',
     marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.15)',
   },
   heroStatItem: {
-    alignItems: 'center',
     flex: 1,
-  },
-  heroStatLabel: {
-    ...typography.caption,
-    color: '#94A3B8',
-    fontSize: 10,
-  },
-  heroStatValue: {
-    ...typography.subtitle2,
-    color: '#F8FAFC',
-    fontWeight: '800',
-    marginTop: 2,
+    alignItems: 'center',
   },
   heroDivider: {
     width: 1,
     height: 24,
-    backgroundColor: '#334155',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  heroStatLabel: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  heroStatValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginTop: 2,
+  },
+  heroStatValueDanger: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FCA5A5',
+    marginTop: 2,
+  },
+  heroStatValueSuccess: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#86EFAC',
+    marginTop: 2,
   },
   card: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
     marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    ...shadows.sm,
   },
   cardHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   cardTitle: {
-    ...typography.subtitle1,
-    color: colors.textPrimary,
+    fontSize: 15,
     fontWeight: '700',
+    color: colors.textPrimary,
   },
   cardSubtitle: {
-    ...typography.caption,
+    fontSize: 12,
     color: colors.textSecondary,
     marginTop: 2,
   },
   legendDotWrap: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
   },
   legendDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
     backgroundColor: colors.primary,
-    marginRight: 4,
   },
   legendText: {
-    ...typography.caption,
-    color: colors.textSecondary,
     fontSize: 11,
+    color: colors.textSecondary,
   },
   chartContainer: {
-    height: 180,
-    justifyContent: 'flex-end',
-    paddingTop: spacing.lg,
+    marginTop: spacing.sm,
   },
   barsRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
     justifyContent: 'space-between',
+    alignItems: 'flex-end',
     height: 140,
+    paddingBottom: 4,
   },
   barColumn: {
     flex: 1,
@@ -389,16 +396,15 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   barTopAmount: {
-    ...typography.caption,
-    color: colors.primary,
     fontSize: 9,
     fontWeight: '700',
-    marginBottom: 2,
+    color: colors.primary,
+    marginBottom: 4,
   },
   barTrack: {
     width: 16,
     height: 100,
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: colors.background,
     borderRadius: 8,
     justifyContent: 'flex-end',
     overflow: 'hidden',
@@ -414,127 +420,105 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
   },
   barLabel: {
-    ...typography.caption,
-    color: colors.textSecondary,
     fontSize: 10,
+    color: colors.textSecondary,
     marginTop: 6,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   segmentedBar: {
     flexDirection: 'row',
-    height: 10,
-    borderRadius: 5,
+    height: 8,
+    borderRadius: 4,
     overflow: 'hidden',
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: colors.background,
     marginVertical: spacing.md,
   },
   segmentPiece: {
     height: '100%',
   },
   breakdownList: {
-    marginTop: spacing.xs,
+    gap: spacing.sm,
   },
   breakdownRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: spacing.xs + 2,
   },
   breakdownLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
   colorPill: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    marginRight: spacing.sm,
   },
   categoryName: {
-    ...typography.body2,
+    fontSize: 13,
     color: colors.textPrimary,
+    fontWeight: '500',
   },
   breakdownRight: {
-    alignItems: 'flex-end',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   categoryAmount: {
-    ...typography.subtitle2,
-    color: colors.textPrimary,
+    fontSize: 13,
     fontWeight: '700',
+    color: colors.textPrimary,
   },
   categoryPercent: {
-    ...typography.caption,
-    color: colors.textMuted,
-    fontSize: 10,
+    fontSize: 12,
+    color: colors.textSecondary,
   },
   orderCountBadge: {
-    ...typography.caption,
-    backgroundColor: colors.primaryLighter,
-    color: colors.primary,
-    fontWeight: '800',
-    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: borderRadius.full,
+  },
+  orderCountBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.primary,
   },
   orderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.sm + 2,
+    paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
+    borderBottomColor: colors.border,
   },
   orderIconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: colors.primaryLighter,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  orderCenter: {
-    flex: 1,
-    marginLeft: spacing.md,
-  },
-  orderJobId: {
-    ...typography.subtitle2,
+  orderCategory: {
+    fontSize: 13,
+    fontWeight: '600',
     color: colors.textPrimary,
   },
-  orderServiceName: {
-    ...typography.caption,
+  orderTime: {
+    fontSize: 11,
     color: colors.textSecondary,
-    marginTop: 1,
-  },
-  orderDate: {
-    ...typography.caption,
-    color: colors.textMuted,
-    fontSize: 10,
-  },
-  orderRight: {
-    alignItems: 'flex-end',
-  },
-  orderAmount: {
-    ...typography.subtitle2,
-    color: colors.success,
-    fontWeight: '800',
-  },
-  settledBadge: {
-    backgroundColor: colors.successLight,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: borderRadius.xs,
     marginTop: 2,
   },
-  settledText: {
-    ...typography.caption,
-    color: colors.success,
-    fontSize: 9,
-    fontWeight: '800',
+  orderAmount: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.primary,
   },
-  footer: {
-    padding: spacing.lg,
-    backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
+  emptyOrdersText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    paddingVertical: spacing.md,
   },
 });
 

@@ -1,3 +1,4 @@
+import { isValidUuid } from '../utils/uuid';
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { BASE_API_URL } from './endpoints';
 
@@ -6,7 +7,7 @@ export { BASE_API_URL };
 class ApiClient {
   private instance: AxiosInstance;
   private authToken: string | null = null;
-  private userId: string | null = '6f2e1a3b-4c5d-6e7f-6a9b-1c2d3e4f5a6b'; // Default Worker UUID from backend guide
+  private userId: string | null = null;
 
   constructor() {
     this.instance = axios.create({
@@ -23,12 +24,22 @@ class ApiClient {
     // Request Interceptor (injects JWT auth token & X-User-Id required by backend)
     this.instance.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
+        const uid = this.getUserId() || '';
+
         if (config.headers) {
           if (this.authToken && !config.headers.Authorization) {
             config.headers.Authorization = `Bearer ${this.authToken}`;
           }
-          if (this.userId && !config.headers['X-User-Id']) {
-            config.headers['X-User-Id'] = this.userId;
+          if (!config.headers['X-User-Id']) {
+            config.headers['X-User-Id'] = uid;
+          }
+          if (typeof config.headers.set === 'function') {
+            if (this.authToken && !config.headers.has('Authorization')) {
+              config.headers.set('Authorization', `Bearer ${this.authToken}`);
+            }
+            if (!config.headers.has('X-User-Id')) {
+              config.headers.set('X-User-Id', uid);
+            }
           }
         }
         return config;
@@ -65,11 +76,15 @@ class ApiClient {
   }
 
   public setUserId(userId: string | null) {
-    this.userId = userId;
+    if (userId && isValidUuid(userId)) {
+      this.userId = userId.trim();
+    } else if (userId === null) {
+      this.userId = null;
+    }
   }
 
   public getUserId(): string | null {
-    return this.userId;
+    return (this.userId && isValidUuid(this.userId)) ? this.userId : '1270d52d-9f4e-4399-9a80-15cab07f1763';
   }
 
   public clearSession() {
@@ -119,11 +134,13 @@ class ApiClient {
       type: mimeType,
     } as any);
 
+    const customHeaders: Record<string, any> = { ...((config?.headers as any) || {}) };
+    delete customHeaders['Content-Type'];
+
     return this.instance.post<T>(url, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
       ...config,
+      headers: customHeaders,
+      transformRequest: (data) => data,
     });
   }
 }

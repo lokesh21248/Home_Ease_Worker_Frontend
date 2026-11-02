@@ -43,7 +43,7 @@ export const Button: React.FC<ButtonProps> = ({
   fullWidth = false,
 }) => {
   const getContainerStyle = (): ViewStyle => {
-    let base: ViewStyle = {
+    let base: any = {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',

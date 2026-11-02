@@ -1,12 +1,13 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, StatusBar, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { borderRadius, shadows, spacing } from '../../theme/spacing';
-import { typography } from '../../theme/typography';
-import Button from '../../components/Button';
+import { PrimaryButton } from '../../components/PrimaryButton';
 import { useApp } from '../../state/AppContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Splash'>;
@@ -27,13 +28,13 @@ export const SplashScreen: React.FC<Props> = ({ navigation }) => {
   }, [isAuthenticated, navigation]);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <StatusBar style="dark" />
 
       <View style={styles.topBadgeContainer}>
         <View style={styles.badge}>
-          <Ionicons name="shield-checkmark" size={14} color={colors.primary} />
-          <Text style={styles.badgeText}>OFFICIAL PARTNER PLATFORM</Text>
+          <Ionicons name="shield-checkmark-outline" size={14} color={colors.primary} />
+          <Text style={styles.badgeText}>OFFICIAL SERVICE PARTNER APP</Text>
         </View>
       </View>
 
@@ -41,39 +42,33 @@ export const SplashScreen: React.FC<Props> = ({ navigation }) => {
         {/* App Logo Emblem */}
         <View style={styles.logoOuterCircle}>
           <View style={styles.logoInnerCircle}>
-            <Ionicons name="construct" size={48} color={colors.surface} />
-          </View>
-          <View style={styles.sparkleBadge}>
-            <Ionicons name="flash" size={16} color={colors.accent} />
+            <Ionicons name="construct-outline" size={44} color="#FFFFFF" />
           </View>
         </View>
 
         {/* Brand Name */}
         <Text style={styles.appName}>
-          HomeEase <Text style={styles.workerAccent}>Worker</Text>
+          HomeEase <Text style={styles.workerAccent}>Partner</Text>
         </Text>
 
         {/* Tagline */}
         <View style={styles.taglineBox}>
-          <Text style={styles.taglineMain}>Manage Services</Text>
-          <Text style={styles.taglineSub}>Grow Your Earnings</Text>
+          <Text style={styles.taglineMain}>Manage Bookings • Earn Daily</Text>
         </View>
 
         <Text style={styles.description}>
-          The all-in-one professional app for cleaners, plumbers, electricians, AC technicians, and home care experts.
+          The dedicated pro partner application for certified cleaners, electricians, plumbers, and home service specialists.
         </Text>
       </View>
 
       {/* Bottom CTA and trust badges */}
       <View style={styles.bottomContainer}>
-        <Button
+        <PrimaryButton
           title="Get Started as Partner"
-          variant="primary"
           size="lg"
           fullWidth
           onPress={() => navigation.navigate('Login')}
-          icon={<Ionicons name="arrow-forward" size={18} color={colors.textInverse} />}
-          iconPosition="right"
+          iconRight={<Ionicons name="arrow-forward-outline" size={18} color="#FFFFFF" />}
         />
 
         <TouchableOpacity
@@ -86,18 +81,18 @@ export const SplashScreen: React.FC<Props> = ({ navigation }) => {
 
         <View style={styles.trustRow}>
           <View style={styles.trustItem}>
-            <Ionicons name="flash" size={14} color={colors.success} />
-            <Text style={styles.trustText}>Instant Payouts</Text>
+            <Ionicons name="flash-outline" size={14} color={colors.primary} />
+            <Text style={styles.trustText}>Direct IMPS</Text>
           </View>
           <View style={styles.trustDot} />
           <View style={styles.trustItem}>
-            <Ionicons name="shield-checkmark" size={14} color={colors.primary} />
-            <Text style={styles.trustText}>Verified Leads</Text>
+            <Ionicons name="shield-checkmark-outline" size={14} color={colors.primary} />
+            <Text style={styles.trustText}>Verified Customers</Text>
           </View>
           <View style={styles.trustDot} />
           <View style={styles.trustItem}>
-            <Ionicons name="star" size={14} color={colors.accent} />
-            <Text style={styles.trustText}>Top Incentives</Text>
+            <Ionicons name="star-outline" size={14} color={colors.primary} />
+            <Text style={styles.trustText}>5-Star Network</Text>
           </View>
         </View>
       </View>
@@ -110,137 +105,111 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.xl,
   },
   topBadgeContainer: {
     alignItems: 'center',
-    paddingTop: spacing.xl,
+    paddingTop: spacing.lg,
   },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.primaryLighter,
+    backgroundColor: colors.primaryLight,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 2,
+    paddingVertical: 6,
     borderRadius: borderRadius.full,
+    gap: 6,
     borderWidth: 1,
-    borderColor: colors.primarySoft,
+    borderColor: colors.border,
   },
   badgeText: {
-    ...typography.caption,
-    color: colors.primary,
+    fontSize: 11,
     fontWeight: '800',
-    fontSize: 10,
-    letterSpacing: 0.8,
-    marginLeft: 4,
+    color: colors.primary,
+    letterSpacing: 0.6,
   },
   centerContent: {
     alignItems: 'center',
-    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.xl,
   },
   logoOuterCircle: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    backgroundColor: colors.primaryLighter,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.xxl,
-    position: 'relative',
-    ...shadows.md,
+    marginBottom: spacing.lg,
   },
   logoInnerCircle: {
-    width: 82,
-    height: 82,
-    borderRadius: 41,
+    width: 76,
+    height: 76,
+    borderRadius: 38,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  sparkleBadge: {
-    position: 'absolute',
-    top: 2,
-    right: 4,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: colors.accent,
     ...shadows.sm,
   },
   appName: {
-    ...typography.h1,
-    fontSize: 32,
+    fontSize: 30,
+    fontWeight: '900',
     color: colors.textPrimary,
-    marginBottom: spacing.xs,
+    letterSpacing: -0.5,
   },
   workerAccent: {
     color: colors.primary,
   },
   taglineBox: {
-    alignItems: 'center',
-    marginVertical: spacing.md,
+    marginTop: spacing.xs,
+    marginBottom: spacing.md,
   },
   taglineMain: {
-    ...typography.h2,
-    fontSize: 20,
-    color: colors.textPrimary,
-    fontWeight: '800',
-  },
-  taglineSub: {
-    ...typography.h2,
-    fontSize: 20,
-    color: colors.success,
-    fontWeight: '800',
-    marginTop: 2,
+    fontSize: 14,
+    color: colors.primary,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   description: {
-    ...typography.body2,
+    fontSize: 13,
     color: colors.textSecondary,
     textAlign: 'center',
+    lineHeight: 19,
     maxWidth: 320,
-    lineHeight: 20,
-    marginTop: spacing.sm,
   },
   bottomContainer: {
-    paddingBottom: spacing.xxl,
-    width: '100%',
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
   },
   demoLink: {
     alignItems: 'center',
     paddingVertical: spacing.md,
   },
   demoLinkText: {
-    ...typography.subtitle2,
+    fontSize: 13,
     color: colors.primary,
-    textDecorationLine: 'underline',
+    fontWeight: '600',
   },
   trustRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
-    marginTop: spacing.sm,
+    alignItems: 'center',
+    paddingTop: spacing.xs,
+    gap: 8,
   },
   trustItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
   },
   trustText: {
-    ...typography.caption,
-    color: colors.textSecondary,
     fontSize: 11,
+    color: colors.textSecondary,
     fontWeight: '600',
-    marginLeft: 3,
   },
   trustDot: {
     width: 3,
     height: 3,
     borderRadius: 1.5,
-    backgroundColor: colors.textMuted,
-    marginHorizontal: spacing.sm,
+    backgroundColor: colors.border,
   },
 });
 

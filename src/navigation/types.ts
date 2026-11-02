@@ -3,6 +3,7 @@ import { Job } from '../types';
 
 export type BottomTabParamList = {
   HomeTab: undefined;
+  SlotsTab: undefined;
   JobsTab: undefined;
   EarningsTab: undefined;
   ProfileTab: undefined;

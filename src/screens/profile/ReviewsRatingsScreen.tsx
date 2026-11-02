@@ -1,32 +1,37 @@
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme/colors';
 import { borderRadius, shadows, spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-import Header from '../../components/Header';
-import ReviewCard from '../../components/ReviewCard';
+import { CustomHeader } from '../../components/CustomHeader';
+import { PremiumCard } from '../../components/PremiumCard';
+import { ReviewCard } from '../../components/ReviewCard';
 import { useApp } from '../../state/AppContext';
 
 export const ReviewsRatingsScreen: React.FC = () => {
   const { reviewsOverview } = useApp();
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <CustomHeader
         title="Ratings & Reviews"
         subtitle={`Based on ${reviewsOverview.totalReviews} verified service orders`}
         showBack
       />
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Rating Hero Card */}
-        <View style={styles.heroCard}>
+        <PremiumCard style={styles.heroCard}>
           <View style={styles.scoreCol}>
             <Text style={styles.largeScore}>{reviewsOverview.overallRating}</Text>
             <View style={styles.starsRow}>
               {[1, 2, 3, 4, 5].map((s) => (
-                <Ionicons key={s} name="star" size={16} color={colors.accent} />
+                <Ionicons key={s} name="star" size={15} color="#F59E0B" />
               ))}
             </View>
             <Text style={styles.totalReviewsText}>
@@ -48,33 +53,35 @@ export const ReviewsRatingsScreen: React.FC = () => {
               </View>
             ))}
           </View>
-        </View>
+        </PremiumCard>
 
-        {/* Worker Recognition Badges */}
-        <View style={styles.badgesSection}>
-          <Text style={styles.sectionHeader}>Customer Recognition Badges</Text>
-          <View style={styles.badgeGrid}>
-            {reviewsOverview.badges.map((b) => (
-              <View key={b.id} style={styles.badgeCard}>
-                <View style={styles.badgeIconCircle}>
-                  <Ionicons name={b.icon as any} size={20} color={colors.primary} />
-                </View>
-                <Text style={styles.badgeTitle}>{b.title}</Text>
-                <Text style={styles.badgeCount}>{b.count} customers tagged this</Text>
-              </View>
-            ))}
+        {/* Customer Recognition Badges */}
+        {reviewsOverview.badges.length > 0 ? (
+          <View style={styles.badgesSection}>
+            <Text style={styles.sectionHeader}>Customer Recognition Badges</Text>
+            <View style={styles.badgeGrid}>
+              {reviewsOverview.badges.map((b) => (
+                <PremiumCard key={b.id} style={styles.badgeCard} padding={spacing.md}>
+                  <View style={styles.badgeIconCircle}>
+                    <Ionicons name={b.icon as any} size={20} color={colors.primary} />
+                  </View>
+                  <Text style={styles.badgeTitle}>{b.title}</Text>
+                  <Text style={styles.badgeCount}>{b.count} customers</Text>
+                </PremiumCard>
+              ))}
+            </View>
           </View>
-        </View>
+        ) : null}
 
-        {/* Customer Reviews List */}
-        <View style={styles.reviewsListHeader}>
-          <Text style={styles.sectionHeader}>Customer Feedback</Text>
-          <Text style={styles.latestCount}>Showing latest {reviewsOverview.reviews.length}</Text>
-        </View>
-
-        {reviewsOverview.reviews.map((rev) => (
-          <ReviewCard key={rev.id} review={rev} />
-        ))}
+        {/* Customer Reviews Section */}
+        <Text style={styles.sectionHeader}>Customer Feedback</Text>
+        {reviewsOverview.reviews.length > 0 ? (
+          reviewsOverview.reviews.map((rev) => (
+            <ReviewCard key={rev.id} review={rev} />
+          ))
+        ) : (
+          <Text style={styles.emptyReviewsText}>No customer reviews received yet.</Text>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -86,134 +93,114 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   scrollContent: {
-    padding: spacing.lg,
+    padding: spacing.md,
     paddingBottom: spacing.xxl,
   },
   heroCard: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    ...shadows.sm,
+    marginBottom: spacing.md,
   },
   scoreCol: {
     alignItems: 'center',
     paddingRight: spacing.md,
   },
   largeScore: {
-    fontSize: 48,
+    fontSize: 38,
     fontWeight: '900',
     color: colors.textPrimary,
-    lineHeight: 52,
   },
   starsRow: {
     flexDirection: 'row',
-    marginVertical: 4,
     gap: 2,
+    marginVertical: 4,
   },
   totalReviewsText: {
-    ...typography.caption,
-    color: colors.textSecondary,
     fontSize: 11,
+    color: colors.textSecondary,
+    fontWeight: '500',
   },
   heroDivider: {
     width: 1,
-    height: 90,
-    backgroundColor: colors.borderLight,
-    marginHorizontal: spacing.md,
+    height: 70,
+    backgroundColor: colors.border,
+    marginRight: spacing.md,
   },
   distributionCol: {
     flex: 1,
+    gap: 4,
   },
   distRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 2,
+    gap: 6,
   },
   starNum: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    width: 22,
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '600',
+    color: colors.textSecondary,
+    width: 20,
   },
   track: {
     flex: 1,
-    height: 7,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: 4,
-    marginHorizontal: spacing.xs + 2,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.background,
     overflow: 'hidden',
   },
   trackFill: {
     height: '100%',
-    backgroundColor: colors.accent,
-    borderRadius: 4,
+    backgroundColor: colors.primary,
+    borderRadius: 3,
   },
   starPercent: {
-    ...typography.caption,
-    color: colors.textMuted,
     fontSize: 10,
-    width: 28,
+    color: colors.textSecondary,
+    width: 26,
     textAlign: 'right',
   },
   badgesSection: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   sectionHeader: {
-    ...typography.subtitle1,
-    color: colors.textPrimary,
+    fontSize: 15,
     fontWeight: '700',
+    color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
   badgeGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: spacing.sm,
-    justifyContent: 'space-between',
   },
   badgeCard: {
-    width: '48%',
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    ...shadows.sm,
+    flex: 1,
+    alignItems: 'center',
   },
   badgeIconCircle: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: colors.primaryLighter,
+    backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.xs,
+    marginBottom: 6,
   },
   badgeTitle: {
-    ...typography.subtitle2,
+    fontSize: 12,
+    fontWeight: '700',
     color: colors.textPrimary,
+    textAlign: 'center',
   },
   badgeCount: {
-    ...typography.caption,
+    fontSize: 11,
     color: colors.textSecondary,
-    fontSize: 10,
     marginTop: 2,
   },
-  reviewsListHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  latestCount: {
-    ...typography.caption,
-    color: colors.primary,
-    fontWeight: '700',
+  emptyReviewsText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    paddingVertical: spacing.lg,
   },
 });
 

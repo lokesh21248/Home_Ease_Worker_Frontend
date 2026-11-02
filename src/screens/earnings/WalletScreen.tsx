@@ -3,20 +3,21 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   Modal,
+  TextInput,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme/colors';
 import { borderRadius, shadows, spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-import Header from '../../components/Header';
-import Button from '../../components/Button';
-import Input from '../../components/Input';
-import Badge from '../../components/Badge';
+import { CustomHeader } from '../../components/CustomHeader';
+import { PremiumCard } from '../../components/PremiumCard';
+import { PrimaryButton } from '../../components/PrimaryButton';
+import { SecondaryButton } from '../../components/SecondaryButton';
 import { useApp } from '../../state/AppContext';
 
 export const WalletScreen: React.FC = () => {
@@ -46,8 +47,8 @@ export const WalletScreen: React.FC = () => {
 
       if (res.success) {
         Alert.alert(
-          'Withdrawal Initiated 🎉',
-          `₹${amountNum.toLocaleString()} has been sent to your verified ${bankDetails.bankName} account (****${bankDetails.accountNumber.slice(-4)}).`
+          'Withdrawal Initiated',
+          `₹${amountNum.toLocaleString()} has been sent to your verified ${bankDetails.bankName} account (••••${bankDetails.accountNumber.slice(-4)}).`
         );
       } else {
         Alert.alert('Error', res.message);
@@ -56,27 +57,35 @@ export const WalletScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header title="Partner Wallet" subtitle="Direct bank deposits & transaction history" showBack />
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Top Header */}
+      <CustomHeader
+        title="Partner Wallet"
+        subtitle="Direct bank deposits & transaction history"
+        showBack
+      />
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Wallet Balance Hero Card */}
         <View style={styles.balanceCard}>
           <View style={styles.balanceTopRow}>
             <View>
-              <Text style={styles.balanceLabel}>Available Balance</Text>
+              <Text style={styles.balanceLabel}>AVAILABLE BALANCE</Text>
               <Text style={styles.balanceAmount}>
                 ₹{wallet.availableBalance.toLocaleString()}
               </Text>
             </View>
 
             <TouchableOpacity
-              style={styles.withdrawBtnCircle}
+              style={styles.withdrawBtn}
               onPress={() => setIsWithdrawModalOpen(true)}
               activeOpacity={0.85}
             >
-              <Ionicons name="arrow-up" size={20} color={colors.textInverse} />
-              <Text style={styles.withdrawBtnCircleText}>Withdraw</Text>
+              <Ionicons name="arrow-up" size={16} color={colors.primary} />
+              <Text style={styles.withdrawBtnText}>Withdraw</Text>
             </TouchableOpacity>
           </View>
 
@@ -91,7 +100,7 @@ export const WalletScreen: React.FC = () => {
             <View style={styles.walletMetaDivider} />
             <View style={styles.walletMetaCol}>
               <Text style={styles.walletMetaLbl}>Pending Clearance</Text>
-              <Text style={[styles.walletMetaVal, { color: colors.warning }]}>
+              <Text style={styles.walletMetaVal}>
                 ₹{wallet.pendingAmount.toLocaleString()}
               </Text>
             </View>
@@ -99,10 +108,10 @@ export const WalletScreen: React.FC = () => {
         </View>
 
         {/* Linked Bank Account Card */}
-        <View style={styles.card}>
+        <PremiumCard style={styles.card}>
           <View style={styles.bankHeaderRow}>
             <View style={styles.bankIconWrap}>
-              <Ionicons name="business" size={20} color={colors.primary} />
+              <Ionicons name="business-outline" size={20} color={colors.primary} />
             </View>
             <View style={styles.bankDetailsCol}>
               <Text style={styles.bankName}>{bankDetails.bankName}</Text>
@@ -110,67 +119,78 @@ export const WalletScreen: React.FC = () => {
                 A/C: •••• •••• {bankDetails.accountNumber.slice(-4)}
               </Text>
             </View>
-            <Badge label="Primary Bank" variant="success" size="sm" />
+            <View style={styles.primaryBankBadge}>
+              <Ionicons name="checkmark-circle" size={12} color={colors.primary} />
+              <Text style={styles.primaryBankText}>Verified Primary</Text>
+            </View>
           </View>
-        </View>
+        </PremiumCard>
 
         {/* Transaction History */}
-        <View style={styles.card}>
+        <PremiumCard style={styles.card}>
           <Text style={styles.sectionTitle}>Transaction History</Text>
           <Text style={styles.sectionSub}>All job payouts, bonuses, and bank transfers</Text>
 
-          {wallet.transactions.map((tx) => {
-            const isCredit = tx.type === 'credit' || tx.type === 'incentive';
+          {wallet.transactions.length > 0 ? (
+            wallet.transactions.map((tx) => {
+              const isCredit = tx.type === 'credit' || tx.type === 'incentive';
 
-            return (
-              <View key={tx.id} style={styles.txRow}>
-                <View
-                  style={[
-                    styles.txIconWrap,
-                    { backgroundColor: isCredit ? colors.successLight : colors.primaryLighter },
-                  ]}
-                >
-                  <Ionicons
-                    name={
-                      tx.type === 'credit'
-                        ? 'arrow-down'
-                        : tx.type === 'incentive'
-                        ? 'gift'
-                        : 'arrow-up'
-                    }
-                    size={18}
-                    color={isCredit ? colors.success : colors.primary}
-                  />
-                </View>
-
-                <View style={styles.txCenterCol}>
-                  <Text style={styles.txTitle} numberOfLines={1}>
-                    {tx.title}
-                  </Text>
-                  <Text style={styles.txMeta}>
-                    {tx.date}, {tx.time} • {tx.transactionId}
-                  </Text>
-                </View>
-
-                <View style={styles.txRightCol}>
-                  <Text
+              return (
+                <View key={tx.id} style={styles.txRow}>
+                  <View
                     style={[
-                      styles.txAmount,
-                      { color: isCredit ? colors.success : colors.textPrimary },
+                      styles.txIconWrap,
+                      { backgroundColor: isCredit ? colors.primaryLight : colors.background },
                     ]}
                   >
-                    {isCredit ? `+ ₹${tx.amount}` : `- ₹${tx.amount}`}
-                  </Text>
-                  <Badge
-                    label={tx.status}
-                    variant={tx.status === 'success' ? 'success' : 'warning'}
-                    size="sm"
-                  />
+                    <Ionicons
+                      name={
+                        tx.type === 'credit'
+                          ? 'arrow-down-outline'
+                          : tx.type === 'incentive'
+                          ? 'gift-outline'
+                          : 'arrow-up-outline'
+                      }
+                      size={18}
+                      color={colors.primary}
+                    />
+                  </View>
+
+                  <View style={styles.txCenterCol}>
+                    <Text style={styles.txTitle} numberOfLines={1}>
+                      {tx.title}
+                    </Text>
+                    <Text style={styles.txMeta}>
+                      {tx.date}, {tx.time} • {tx.transactionId}
+                    </Text>
+                  </View>
+
+                  <View style={styles.txRightCol}>
+                    <Text
+                      style={[
+                        styles.txAmount,
+                        { color: isCredit ? colors.primary : colors.textPrimary },
+                      ]}
+                    >
+                      {isCredit ? `+ ₹${tx.amount}` : `- ₹${tx.amount}`}
+                    </Text>
+                    <View style={styles.txStatusPill}>
+                      <Text style={styles.txStatusText}>{tx.status.toUpperCase()}</Text>
+                    </View>
+                  </View>
                 </View>
-              </View>
-            );
-          })}
-        </View>
+              );
+            })
+          ) : (
+            <View style={styles.emptyTransactions}>
+              <Ionicons name="receipt-outline" size={36} color={colors.textSecondary} />
+              <Text style={styles.emptyTitle}>No Transactions Yet</Text>
+              <Text style={styles.emptySub}>
+                Completed job payouts and withdrawals will appear here.
+              </Text>
+            </View>
+          )}
+        </PremiumCard>
       </ScrollView>
 
       {/* Instant Withdrawal Modal */}
@@ -182,14 +202,17 @@ export const WalletScreen: React.FC = () => {
                 <Text style={styles.sheetTitle}>Withdraw to Bank</Text>
                 <Text style={styles.sheetSub}>Instant IMPS transfer without extra charges</Text>
               </View>
-              <TouchableOpacity onPress={() => setIsWithdrawModalOpen(false)}>
-                <Ionicons name="close-circle" size={26} color={colors.textMuted} />
+              <TouchableOpacity
+                onPress={() => setIsWithdrawModalOpen(false)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="close-circle-outline" size={24} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
             {/* Account Confirmation Box */}
             <View style={styles.targetBankBox}>
-              <Ionicons name="shield-checkmark" size={18} color={colors.success} />
+              <Ionicons name="shield-checkmark-outline" size={18} color={colors.primary} />
               <Text style={styles.targetBankText}>
                 Transferring to: <Text style={{ fontWeight: '700' }}>{bankDetails.bankName}</Text> (
                 ••••{bankDetails.accountNumber.slice(-4)})
@@ -197,15 +220,21 @@ export const WalletScreen: React.FC = () => {
             </View>
 
             {/* Input Amount */}
-            <Input
-              label="Enter Withdrawal Amount"
-              prefix="₹"
-              placeholder="e.g. 5000"
-              value={withdrawAmount}
-              onChangeText={setWithdrawAmount}
-              keyboardType="number-pad"
-              helperText={`Available: ₹${wallet.availableBalance.toLocaleString()}`}
-            />
+            <Text style={styles.inputLabel}>Enter Withdrawal Amount</Text>
+            <View style={styles.amountInputRow}>
+              <Text style={styles.amountPrefix}>₹</Text>
+              <TextInput
+                style={styles.amountInput}
+                value={withdrawAmount}
+                onChangeText={setWithdrawAmount}
+                keyboardType="number-pad"
+                placeholder="5000"
+                placeholderTextColor={colors.textSecondary}
+              />
+            </View>
+            <Text style={styles.helperText}>
+              Available balance: ₹{wallet.availableBalance.toLocaleString()}
+            </Text>
 
             {/* Quick Amount Chips */}
             <View style={styles.quickChipsRow}>
@@ -217,16 +246,15 @@ export const WalletScreen: React.FC = () => {
                 >
                   <Text style={styles.quickChipText}>
                     {preset === wallet.availableBalance
-                      ? 'Withdraw All'
+                      ? 'All'
                       : `₹${preset.toLocaleString()}`}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            <Button
+            <PrimaryButton
               title="Confirm Instant Transfer"
-              variant="primary"
               size="lg"
               fullWidth
               loading={isProcessing}
@@ -246,15 +274,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   scrollContent: {
-    padding: spacing.lg,
+    padding: spacing.md,
     paddingBottom: spacing.xxl,
   },
   balanceCard: {
-    backgroundColor: colors.primaryDark,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
     marginBottom: spacing.md,
-    ...shadows.md,
+    ...shadows.sm,
   },
   balanceTopRow: {
     flexDirection: 'row',
@@ -262,69 +290,61 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   balanceLabel: {
-    ...typography.caption,
-    color: '#93C5FD',
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.8)',
     fontWeight: '700',
-    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   balanceAmount: {
-    fontSize: 36,
+    fontSize: 34,
     fontWeight: '900',
     color: '#FFFFFF',
     marginTop: 2,
   },
-  withdrawBtnCircle: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm + 2,
+  withdrawBtn: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 3,
     borderRadius: borderRadius.full,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
-    ...shadows.sm,
+    gap: 4,
   },
-  withdrawBtnCircleText: {
-    ...typography.subtitle2,
-    color: colors.textInverse,
-    fontWeight: '800',
+  withdrawBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primary,
   },
   walletMetaRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#1E293B',
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
+    alignItems: 'center',
     marginTop: spacing.lg,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.15)',
   },
   walletMetaCol: {
     flex: 1,
     alignItems: 'center',
   },
-  walletMetaLbl: {
-    ...typography.caption,
-    color: '#94A3B8',
-    fontSize: 10,
-  },
-  walletMetaVal: {
-    ...typography.subtitle2,
-    color: '#F8FAFC',
-    fontWeight: '800',
-    marginTop: 2,
-  },
   walletMetaDivider: {
     width: 1,
     height: 24,
-    backgroundColor: '#334155',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  walletMetaLbl: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  walletMetaVal: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginTop: 2,
   },
   card: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
     marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    ...shadows.sm,
   },
   bankHeaderRow: {
     flexDirection: 'row',
@@ -334,7 +354,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.primaryLighter,
+    backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -343,21 +363,36 @@ const styles = StyleSheet.create({
     marginLeft: spacing.md,
   },
   bankName: {
-    ...typography.subtitle1,
+    fontSize: 15,
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   bankAcc: {
-    ...typography.caption,
+    fontSize: 12,
     color: colors.textSecondary,
     marginTop: 2,
   },
-  sectionTitle: {
-    ...typography.subtitle1,
-    color: colors.textPrimary,
+  primaryBankBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: borderRadius.full,
+    gap: 4,
+  },
+  primaryBankText: {
+    fontSize: 11,
     fontWeight: '700',
+    color: colors.primary,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textPrimary,
   },
   sectionSub: {
-    ...typography.caption,
+    fontSize: 12,
     color: colors.textSecondary,
     marginTop: 2,
     marginBottom: spacing.md,
@@ -365,9 +400,9 @@ const styles = StyleSheet.create({
   txRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.sm + 2,
+    paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
+    borderBottomColor: colors.border,
   },
   txIconWrap: {
     width: 38,
@@ -378,88 +413,146 @@ const styles = StyleSheet.create({
   },
   txCenterCol: {
     flex: 1,
-    marginLeft: spacing.md,
-    marginRight: spacing.sm,
+    marginLeft: spacing.sm,
   },
   txTitle: {
-    ...typography.body2,
-    color: colors.textPrimary,
+    fontSize: 13,
     fontWeight: '600',
+    color: colors.textPrimary,
   },
   txMeta: {
-    ...typography.caption,
-    color: colors.textMuted,
-    fontSize: 10,
+    fontSize: 11,
+    color: colors.textSecondary,
     marginTop: 2,
   },
   txRightCol: {
     alignItems: 'flex-end',
   },
   txAmount: {
-    ...typography.subtitle2,
-    fontWeight: '800',
-    marginBottom: 2,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  txStatusPill: {
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 8,
+    marginTop: 2,
+  },
+  txStatusText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  emptyTransactions: {
+    paddingVertical: spacing.xl,
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginTop: spacing.sm,
+  },
+  emptySub: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 4,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: colors.overlay,
+    backgroundColor: 'rgba(23, 36, 58, 0.5)',
     justifyContent: 'flex-end',
   },
   withdrawSheet: {
-    backgroundColor: colors.surface,
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: borderRadius.xl,
     borderTopRightRadius: borderRadius.xl,
-    padding: spacing.xl,
-    ...shadows.lg,
+    padding: spacing.lg,
+    paddingBottom: spacing.xxl,
+    ...shadows.md,
   },
   sheetHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: spacing.md,
   },
   sheetTitle: {
-    ...typography.h2,
+    fontSize: 18,
+    fontWeight: '800',
     color: colors.textPrimary,
   },
   sheetSub: {
-    ...typography.caption,
+    fontSize: 12,
     color: colors.textSecondary,
-    marginTop: 2,
+    marginTop: 1,
   },
   targetBankBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.successLight,
-    padding: spacing.md,
+    backgroundColor: colors.primaryLight,
+    padding: spacing.sm + 2,
     borderRadius: borderRadius.md,
-    marginBottom: spacing.lg,
-    gap: spacing.xs + 2,
+    gap: 8,
+    marginBottom: spacing.md,
   },
   targetBankText: {
-    ...typography.caption,
-    color: '#065F46',
+    fontSize: 12,
+    color: colors.textPrimary,
+  },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: 6,
+  },
+  amountInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+  },
+  amountPrefix: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginRight: 6,
+  },
+  amountInput: {
     flex: 1,
+    height: 48,
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  helperText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 4,
+    marginBottom: spacing.md,
   },
   quickChipsRow: {
     flexDirection: 'row',
     gap: spacing.sm,
-    marginBottom: spacing.md,
   },
   quickChip: {
     flex: 1,
-    paddingVertical: spacing.sm,
+    paddingVertical: 8,
     borderRadius: borderRadius.md,
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.border,
     alignItems: 'center',
   },
   quickChipText: {
-    ...typography.caption,
+    fontSize: 12,
+    fontWeight: '600',
     color: colors.textPrimary,
-    fontWeight: '700',
-    fontSize: 11,
   },
 });
 

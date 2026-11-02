@@ -1,44 +1,63 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   Image,
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { borderRadius, shadows, spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-import Header from '../../components/Header';
-import Button from '../../components/Button';
-import Badge from '../../components/Badge';
+import { CustomHeader } from '../../components/CustomHeader';
+import { PremiumCard } from '../../components/PremiumCard';
+import { PrimaryButton } from '../../components/PrimaryButton';
+import { SecondaryButton } from '../../components/SecondaryButton';
 import { useApp } from '../../state/AppContext';
 import { openTurnByTurnNavigation } from '../../utils/navigationHelper';
 import { resolveBookingUuid } from '../../utils/uuid';
+import { workerApiService } from '../../api/workerApiService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'JobDetails'>;
 
 export const JobDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const { job } = route.params;
   const { acceptJob, rejectJob } = useApp();
+  const [liveBooking, setLiveBooking] = useState<any>(null);
+
+  useEffect(() => {
+    const bookingUuid = resolveBookingUuid(job.bookingId, job.id);
+    workerApiService
+      .getBookingDetails(bookingUuid)
+      .then((res: any) => {
+        if (res) {
+          setLiveBooking(res);
+        }
+      })
+      .catch(() => {});
+  }, [job]);
 
   const handleAccept = () => {
     const bookingId = resolveBookingUuid(job.bookingId, job.id);
-    navigation.navigate('ActiveJob', { job: { ...job, bookingId, status: 'accepted' }, bookingId });
+    acceptJob(bookingId);
+    navigation.navigate('ActiveJob', {
+      job: { ...job, bookingId, status: 'accepted' },
+      bookingId,
+    });
   };
 
   const handleReject = () => {
     Alert.alert(
       'Decline Booking',
-      `Decline #${job.jobId} for ${job.customer.name}?`,
+      `Are you sure you want to decline job #${job.jobId} for ${job.customer.name}?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Keep Job', style: 'cancel' },
         {
           text: 'Decline',
           style: 'destructive',
@@ -51,34 +70,78 @@ export const JobDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     );
   };
 
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'accepted':
+      case 'started':
+      case 'completed':
+        return colors.success;
+      case 'cancelled':
+        return colors.danger;
+      default:
+        return colors.primary;
+    }
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
-      <Header
-        title={`Booking ${job.jobId}`}
-        subtitle={job.category}
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Top Header */}
+      <CustomHeader
+        title={`Booking #${job.jobId}`}
+        subtitle={job.category || 'Home Service'}
         showBack
         onBack={() => navigation.goBack()}
         rightAction={
-          <Badge
-            label={job.status.toUpperCase()}
-            variant={job.status === 'requested' ? 'warning' : 'success'}
-            size="sm"
-          />
+          <View
+            style={[
+              styles.statusPill,
+              { backgroundColor: getStatusColor(job.status) + '15' },
+            ]}
+          >
+            <View
+              style={[
+                styles.statusDot,
+                { backgroundColor: getStatusColor(job.status) },
+              ]}
+            />
+            <Text
+              style={[
+                styles.statusText,
+                { color: getStatusColor(job.status) },
+              ]}
+            >
+              {job.status.toUpperCase()}
+            </Text>
+          </View>
         }
       />
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Customer Profile Card */}
-        <View style={styles.card}>
+        <PremiumCard style={styles.card}>
           <View style={styles.customerRow}>
-            <Image source={{ uri: job.customer.avatar }} style={styles.avatar} />
+            <Image
+              source={{
+                uri:
+                  job.customer.avatar ||
+                  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+              }}
+              style={styles.avatar}
+            />
             <View style={styles.customerMeta}>
               <View style={styles.nameBadgeRow}>
                 <Text style={styles.customerName}>{job.customer.name}</Text>
-                <Badge label="Verified User" variant="primary" size="sm" />
+                <View style={styles.verifiedTag}>
+                  <Ionicons name="checkmark-circle" size={12} color="#FFFFFF" />
+                  <Text style={styles.verifiedText}>VERIFIED</Text>
+                </View>
               </View>
+
               <View style={styles.ratingRow}>
-                <Ionicons name="star" size={14} color={colors.accent} />
+                <Ionicons name="star" size={13} color="#F59E0B" />
                 <Text style={styles.ratingText}>
                   {job.customer.rating} ({job.customer.totalBookings} past bookings)
                 </Text>
@@ -91,17 +154,17 @@ export const JobDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
               activeOpacity={0.8}
               onPress={() => Alert.alert('Dialing Customer', `Calling ${job.customer.phone}...`)}
             >
-              <Ionicons name="call" size={20} color={colors.primary} />
+              <Ionicons name="call-outline" size={20} color={colors.primary} />
             </TouchableOpacity>
           </View>
-        </View>
+        </PremiumCard>
 
-        {/* Service & Schedule Card */}
-        <View style={styles.card}>
+        {/* Service Requirements Card */}
+        <PremiumCard style={styles.card}>
           <Text style={styles.sectionHeader}>Service Requirements</Text>
           <View style={styles.serviceItem}>
             <View style={styles.serviceIconWrap}>
-              <Ionicons name="construct" size={20} color={colors.primary} />
+              <Ionicons name="construct-outline" size={20} color={colors.primary} />
             </View>
             <View style={styles.serviceTextCol}>
               <Text style={styles.serviceTitle}>{job.serviceName}</Text>
@@ -131,22 +194,25 @@ export const JobDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
               </View>
             </View>
           </View>
-        </View>
+        </PremiumCard>
 
         {/* Destination Location Card */}
-        <View style={styles.card}>
+        <PremiumCard style={styles.card}>
           <View style={styles.locationHeaderRow}>
             <Text style={styles.sectionHeader}>Service Location</Text>
-            <Text style={styles.distanceBadge}>{job.location.distanceKm} km away</Text>
+            <View style={styles.distanceBadge}>
+              <Ionicons name="navigate-outline" size={12} color={colors.primary} />
+              <Text style={styles.distanceText}>{job.location.distanceKm} km away</Text>
+            </View>
           </View>
 
           <View style={styles.addressBox}>
-            <Ionicons name="location" size={20} color={colors.danger} style={{ marginTop: 2 }} />
+            <Ionicons name="location-outline" size={20} color={colors.primary} style={{ marginTop: 2 }} />
             <View style={styles.addressTextCol}>
               <Text style={styles.addressLine}>{job.location.address}</Text>
-              {job.location.landmark && (
+              {job.location.landmark ? (
                 <Text style={styles.landmarkLine}>Landmark: {job.location.landmark}</Text>
-              )}
+              ) : null}
               <Text style={styles.cityPincode}>
                 {job.location.city} - {job.location.pincode}
               </Text>
@@ -154,9 +220,8 @@ export const JobDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
 
           <View style={styles.navRow}>
-            <Button
+            <PrimaryButton
               title="1-Tap GPS (Maps)"
-              variant="primary"
               size="md"
               onPress={() =>
                 openTurnByTurnNavigation({
@@ -166,45 +231,49 @@ export const JobDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                   address: job.location.address,
                 })
               }
-              icon={<Ionicons name="navigate" size={16} color={colors.textInverse} />}
+              icon={<Ionicons name="navigate-circle-outline" size={18} color="#FFFFFF" />}
               style={{ flex: 1.2 }}
             />
-            <Button
+            <SecondaryButton
               title="In-App View"
-              variant="secondary"
               size="md"
               onPress={() => navigation.navigate('NavigationTracking', { job })}
-              icon={<Ionicons name="map-outline" size={16} color={colors.textInverse} />}
+              icon={<Ionicons name="map-outline" size={18} color={colors.primary} />}
               style={{ flex: 1 }}
             />
           </View>
-        </View>
+        </PremiumCard>
 
         {/* Customer Instructions */}
-        <View style={styles.card}>
-          <Text style={styles.sectionHeader}>Customer Notes & Instructions</Text>
-          <View style={styles.notesBox}>
-            <Ionicons name="chatbubble-ellipses-outline" size={18} color={colors.primary} />
-            <Text style={styles.notesText}>{job.instructions}</Text>
-          </View>
-        </View>
+        {job.instructions ? (
+          <PremiumCard style={styles.card}>
+            <Text style={styles.sectionHeader}>Customer Notes & Instructions</Text>
+            <View style={styles.notesBox}>
+              <Ionicons name="chatbubble-ellipses-outline" size={18} color={colors.primary} />
+              <Text style={styles.notesText}>{job.instructions}</Text>
+            </View>
+          </PremiumCard>
+        ) : null}
 
         {/* Pricing Breakdown Card */}
-        <View style={styles.card}>
+        <PremiumCard style={styles.card}>
           <Text style={styles.sectionHeader}>Fare & Payout Breakdown</Text>
           <View style={styles.priceRow}>
             <Text style={styles.priceItemLabel}>Service Total (Customer Paid)</Text>
             <Text style={styles.priceItemValue}>₹{job.price}</Text>
           </View>
           <View style={styles.priceRow}>
-            <Text style={styles.priceItemLabel}>Platform Service Commission (15%)</Text>
+            <Text style={styles.priceItemLabel}>Platform Fee / Commission (15%)</Text>
             <Text style={[styles.priceItemValue, { color: colors.danger }]}>
               - ₹{job.commission}
             </Text>
           </View>
           <View style={styles.priceRow}>
             <Text style={styles.priceItemLabel}>Payment Mode</Text>
-            <Badge label={job.paymentMode} variant="info" size="sm" />
+            <View style={styles.payModePill}>
+              <Ionicons name="card-outline" size={12} color={colors.primary} />
+              <Text style={styles.payModeText}>{job.paymentMode}</Text>
+            </View>
           </View>
 
           <View style={styles.payoutHighlightBox}>
@@ -214,42 +283,38 @@ export const JobDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
             <Text style={styles.netPayoutValue}>₹{job.netPayout}</Text>
           </View>
-        </View>
+        </PremiumCard>
       </ScrollView>
 
       {/* Action Footer */}
       <View style={styles.footer}>
         {job.status === 'requested' ? (
           <View style={styles.btnRow}>
-            <Button
+            <SecondaryButton
               title="Decline"
-              variant="outline"
               size="lg"
               onPress={handleReject}
               style={styles.rejectBtn}
               textStyle={{ color: colors.danger }}
             />
-            <Button
+            <PrimaryButton
               title="Accept & Start"
-              variant="primary"
               size="lg"
               onPress={handleAccept}
               style={styles.acceptBtn}
-              icon={<Ionicons name="checkmark-circle" size={18} color={colors.textInverse} />}
+              icon={<Ionicons name="checkmark-circle-outline" size={18} color="#FFFFFF" />}
             />
           </View>
         ) : (
-          <Button
+          <PrimaryButton
             title="Proceed to Active Job Screen"
-            variant="primary"
             size="lg"
             fullWidth
             onPress={() => {
               const bookingId = resolveBookingUuid(job.bookingId, job.id);
               navigation.navigate('ActiveJob', { job: { ...job, bookingId }, bookingId });
             }}
-            icon={<Ionicons name="arrow-forward" size={18} color={colors.textInverse} />}
-            iconPosition="right"
+            iconRight={<Ionicons name="arrow-forward-outline" size={18} color="#FFFFFF" />}
           />
         )}
       </View>
@@ -263,27 +328,39 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   scrollContent: {
-    padding: spacing.lg,
+    padding: spacing.md,
     paddingBottom: spacing.xxl,
   },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 4,
+    borderRadius: borderRadius.full,
+    gap: 4,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
   card: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
     marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    ...shadows.sm,
   },
   customerRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   avatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: colors.surfaceAlt,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: colors.primaryLight,
   },
   customerMeta: {
     flex: 1,
@@ -295,31 +372,48 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   customerName: {
-    ...typography.subtitle1,
+    fontSize: 16,
+    fontWeight: '700',
     color: colors.textPrimary,
+  },
+  verifiedTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    gap: 3,
+  },
+  verifiedText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.4,
   },
   ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 3,
+    marginTop: 4,
+    gap: 4,
   },
   ratingText: {
-    ...typography.caption,
+    fontSize: 12,
     color: colors.textSecondary,
-    marginLeft: 3,
+    fontWeight: '500',
   },
   callCircle: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.primaryLighter,
+    backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
   sectionHeader: {
-    ...typography.subtitle1,
-    color: colors.textPrimary,
+    fontSize: 15,
     fontWeight: '700',
+    color: colors.textPrimary,
     marginBottom: spacing.md,
   },
   serviceItem: {
@@ -327,29 +421,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   serviceIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primaryLighter,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
   serviceTextCol: {
-    marginLeft: spacing.md,
     flex: 1,
+    marginLeft: spacing.md,
   },
   serviceTitle: {
-    ...typography.subtitle2,
+    fontSize: 15,
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   serviceEst: {
-    ...typography.caption,
+    fontSize: 13,
     color: colors.textSecondary,
     marginTop: 2,
   },
   divider: {
     height: 1,
-    backgroundColor: colors.borderLight,
+    backgroundColor: colors.border,
     marginVertical: spacing.md,
   },
   infoRow: {
@@ -360,18 +455,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   infoLabel: {
-    ...typography.caption,
-    color: colors.textMuted,
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontWeight: '500',
     marginBottom: 4,
   },
   infoValueRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
   },
   infoValue: {
-    ...typography.subtitle2,
+    fontSize: 14,
+    fontWeight: '600',
     color: colors.textPrimary,
-    marginLeft: 4,
   },
   locationHeaderRow: {
     flexDirection: 'row',
@@ -380,55 +477,67 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   distanceBadge: {
-    ...typography.caption,
-    backgroundColor: colors.primaryLighter,
-    color: colors.primary,
-    fontWeight: '700',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primaryLight,
     paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
+    paddingVertical: 4,
     borderRadius: borderRadius.full,
+    gap: 4,
+  },
+  distanceText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.primary,
   },
   addressBox: {
     flexDirection: 'row',
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: colors.background,
     padding: spacing.md,
     borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
     marginBottom: spacing.md,
   },
   addressTextCol: {
-    marginLeft: spacing.sm,
     flex: 1,
+    marginLeft: spacing.sm,
   },
   addressLine: {
-    ...typography.body2,
-    color: colors.textPrimary,
+    fontSize: 14,
     fontWeight: '600',
+    color: colors.textPrimary,
+    lineHeight: 20,
   },
   landmarkLine: {
-    ...typography.caption,
+    fontSize: 12,
     color: colors.textSecondary,
     marginTop: 2,
   },
   cityPincode: {
-    ...typography.caption,
-    color: colors.textMuted,
+    fontSize: 12,
+    color: colors.textSecondary,
     marginTop: 2,
   },
-  navigateBtn: {
-    marginTop: spacing.xs,
+  navRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
   notesBox: {
     flexDirection: 'row',
-    backgroundColor: colors.primaryLighter,
+    backgroundColor: colors.primaryLight,
     padding: spacing.md,
     borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
     gap: spacing.sm,
+    alignItems: 'flex-start',
   },
   notesText: {
-    ...typography.body2,
-    color: colors.primaryDark,
     flex: 1,
-    lineHeight: 20,
+    fontSize: 13,
+    color: colors.textPrimary,
+    lineHeight: 18,
   },
   priceRow: {
     flexDirection: 'row',
@@ -437,49 +546,61 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs + 2,
   },
   priceItemLabel: {
-    ...typography.body2,
+    fontSize: 13,
     color: colors.textSecondary,
   },
   priceItemValue: {
-    ...typography.subtitle2,
+    fontSize: 14,
+    fontWeight: '600',
     color: colors.textPrimary,
+  },
+  payModePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: borderRadius.full,
+    gap: 4,
+  },
+  payModeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.primary,
   },
   payoutHighlightBox: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.successLight,
+    alignItems: 'center',
+    backgroundColor: colors.primary,
     padding: spacing.md,
     borderRadius: borderRadius.md,
     marginTop: spacing.md,
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
   },
   payoutTitle: {
-    ...typography.subtitle2,
-    color: '#065F46',
-    fontWeight: '800',
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   payoutSub: {
-    ...typography.caption,
-    color: '#047857',
     fontSize: 11,
-    marginTop: 1,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginTop: 2,
   },
   netPayoutValue: {
-    ...typography.h2,
-    color: colors.success,
-    fontWeight: '900',
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
   footer: {
-    padding: spacing.lg,
-    backgroundColor: colors.surface,
+    padding: spacing.md,
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
+    borderTopColor: colors.border,
   },
   btnRow: {
     flexDirection: 'row',
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   rejectBtn: {
     flex: 1,
@@ -487,11 +608,6 @@ const styles = StyleSheet.create({
   },
   acceptBtn: {
     flex: 2,
-  },
-  navRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.md,
   },
 });
 

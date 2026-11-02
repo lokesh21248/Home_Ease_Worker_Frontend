@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   Image,
   Alert,
@@ -11,14 +10,14 @@ import {
   TextInput,
   ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { borderRadius, shadows, spacing } from '../../theme/spacing';
-import { typography } from '../../theme/typography';
-import Header from '../../components/Header';
-import Button from '../../components/Button';
+import { CustomHeader } from '../../components/CustomHeader';
+import { PrimaryButton } from '../../components/PrimaryButton';
 import { useApp } from '../../state/AppContext';
 import { openTurnByTurnNavigation } from '../../utils/navigationHelper';
 import { alertFeedbackService } from '../../services/alertFeedbackService';
@@ -45,7 +44,7 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
     {
       id: 'm1',
       sender: 'customer',
-      text: 'Hi Raj! Please ring the doorbell twice when you arrive at Flat 402.',
+      text: 'Hi Partner! Please ring the doorbell twice when you reach the flat.',
       time: '11:15 AM',
     },
     {
@@ -67,7 +66,6 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
     setMessages((prev) => [...prev, newMsg]);
     setChatInput('');
 
-    // Simulate customer auto-reply
     setTimeout(() => {
       setMessages((prev) => [
         ...prev,
@@ -89,8 +87,8 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <CustomHeader
         title="Live Turn-by-Turn GPS"
         subtitle={`To ${job.customer.name}'s Location`}
         showBack
@@ -100,11 +98,11 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
       {/* Turn-by-Turn Instruction Banner */}
       <View style={styles.turnBanner}>
         <View style={styles.turnIconCircle}>
-          <Ionicons name="arrow-up" size={26} color={colors.textInverse} />
+          <Ionicons name="arrow-up" size={24} color="#FFFFFF" />
         </View>
         <View style={styles.turnInfoCol}>
           <Text style={styles.turnDistance}>In 250 meters</Text>
-          <Text style={styles.turnInstruction}>Turn left onto KPHB 7th Phase Main Rd</Text>
+          <Text style={styles.turnInstruction}>Turn left onto Main Road</Text>
         </View>
         <View style={styles.speedPill}>
           <Text style={styles.speedText}>32</Text>
@@ -114,7 +112,6 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
 
       {/* Vector / Styled Map Simulation Area */}
       <View style={styles.mapArea}>
-        {/* Decorative Grid Lines to simulate high-tech GIS map */}
         <View style={styles.mapGridHorizontal1} />
         <View style={styles.mapGridHorizontal2} />
         <View style={styles.mapGridVertical1} />
@@ -125,7 +122,7 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
           {/* Worker Start Pin */}
           <View style={styles.workerPin}>
             <View style={styles.workerPulseCircle} />
-            <Ionicons name="bicycle" size={20} color={colors.surface} />
+            <Ionicons name="bicycle-outline" size={18} color="#FFFFFF" />
           </View>
 
           {/* S-curve dashed route simulation */}
@@ -135,9 +132,9 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
 
           {/* Destination Customer Pin */}
           <View style={styles.destinationPin}>
-            <Ionicons name="location" size={28} color={colors.danger} />
+            <Ionicons name="location" size={26} color={colors.primary} />
             <View style={styles.destBadge}>
-              <Text style={styles.destBadgeText}>Customer Flat 402</Text>
+              <Text style={styles.destBadgeText}>Customer Address</Text>
             </View>
           </View>
         </View>
@@ -149,12 +146,12 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
             activeOpacity={0.8}
             onPress={() => Alert.alert('Recenter', 'Map centered to worker GPS location.')}
           >
-            <Ionicons name="locate" size={20} color={colors.primary} />
+            <Ionicons name="locate-outline" size={20} color={colors.primary} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.mapBtn}
             activeOpacity={0.8}
-            onPress={() => Alert.alert('Traffic Layer', 'Live traffic enabled (Green normal flow).')}
+            onPress={() => Alert.alert('Traffic Layer', 'Live traffic enabled.')}
           >
             <Ionicons name="layers-outline" size={20} color={colors.textPrimary} />
           </TouchableOpacity>
@@ -174,12 +171,19 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
         </View>
       </View>
 
-      {/* Bottom Sheet Card: Customer Details & Actions */}
+      {/* Bottom Sheet Card */}
       <View style={styles.bottomCard}>
         <View style={styles.dragPill} />
 
         <View style={styles.customerRow}>
-          <Image source={{ uri: job.customer.avatar }} style={styles.customerAvatar} />
+          <Image
+            source={{
+              uri:
+                job.customer.avatar ||
+                'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+            }}
+            style={styles.customerAvatar}
+          />
           <View style={styles.customerMeta}>
             <Text style={styles.customerName}>{job.customer.name}</Text>
             <Text style={styles.jobType}>{job.serviceName}</Text>
@@ -195,7 +199,7 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
             activeOpacity={0.8}
             onPress={() => Alert.alert('Calling Customer', `Calling ${job.customer.phone}...`)}
           >
-            <Ionicons name="call" size={20} color={colors.primary} />
+            <Ionicons name="call-outline" size={20} color={colors.primary} />
             <Text style={styles.circleActionText}>Call</Text>
           </TouchableOpacity>
 
@@ -204,7 +208,7 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
             activeOpacity={0.8}
             onPress={() => setIsChatOpen(true)}
           >
-            <Ionicons name="chatbubble-ellipses" size={20} color={colors.info} />
+            <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.primary} />
             <Text style={styles.circleActionText}>Chat</Text>
           </TouchableOpacity>
 
@@ -221,7 +225,7 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
               })
             }
           >
-            <Ionicons name="navigate-circle" size={22} color={colors.primary} />
+            <Ionicons name="navigate-circle-outline" size={22} color={colors.primary} />
             <Text style={styles.circleActionText}>Maps</Text>
           </TouchableOpacity>
 
@@ -229,21 +233,20 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
             style={styles.circleActionButton}
             activeOpacity={0.8}
             onPress={() =>
-              Alert.alert('Safety SOS', 'Emergency alert sent to HomeEase Rapid Response Team.')
+              Alert.alert('Safety Desk', 'Emergency alert notified to support.')
             }
           >
-            <Ionicons name="shield-outline" size={20} color={colors.danger} />
-            <Text style={[styles.circleActionText, { color: colors.danger }]}>SOS</Text>
+            <Ionicons name="shield-outline" size={20} color={colors.primary} />
+            <Text style={styles.circleActionText}>SOS</Text>
           </TouchableOpacity>
         </View>
 
-        <Button
-          title="I Have Arrived at Location 📍"
-          variant="primary"
+        <PrimaryButton
+          title="I Have Arrived at Location"
           size="lg"
           fullWidth
           onPress={handleArrived}
-          style={styles.arrivedBtn}
+          icon={<Ionicons name="location-outline" size={20} color="#FFFFFF" />}
         />
       </View>
 
@@ -253,50 +256,60 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
         animationType="slide"
         onRequestClose={() => setIsChatOpen(false)}
       >
-        <SafeAreaView style={styles.chatModalContainer}>
-          <Header
+        <SafeAreaView style={styles.chatModalContainer} edges={['top']}>
+          <CustomHeader
             title={`Chat with ${job.customer.name}`}
-            subtitle="Encrypted in-app partner messaging"
+            subtitle="Encrypted in-app messaging"
             showBack
             onBack={() => setIsChatOpen(false)}
           />
 
-          <ScrollView style={styles.chatMessagesContainer}>
-            {messages.map((m) => (
-              <View
-                key={m.id}
-                style={[
-                  styles.messageBubble,
-                  m.sender === 'worker' ? styles.workerBubble : styles.customerBubble,
-                ]}
-              >
-                <Text
+          <ScrollView style={styles.chatScroll} contentContainerStyle={{ padding: spacing.md }}>
+            {messages.map((msg) => {
+              const isWorker = msg.sender === 'worker';
+              return (
+                <View
+                  key={msg.id}
                   style={[
-                    styles.messageText,
-                    m.sender === 'worker' ? styles.workerMsgText : styles.customerMsgText,
+                    styles.chatBubble,
+                    isWorker ? styles.chatBubbleWorker : styles.chatBubbleCustomer,
                   ]}
                 >
-                  {m.text}
-                </Text>
-                <Text style={styles.msgTime}>{m.time}</Text>
-              </View>
-            ))}
+                  <Text
+                    style={[
+                      styles.chatText,
+                      isWorker ? styles.chatTextWorker : styles.chatTextCustomer,
+                    ]}
+                  >
+                    {msg.text}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.chatTimeText,
+                      isWorker ? styles.chatTimeWorker : styles.chatTimeCustomer,
+                    ]}
+                  >
+                    {msg.time}
+                  </Text>
+                </View>
+              );
+            })}
           </ScrollView>
 
           <View style={styles.chatInputRow}>
             <TextInput
               style={styles.chatTextInput}
-              placeholder="Type message to customer..."
-              placeholderTextColor={colors.textMuted}
+              placeholder="Type message..."
+              placeholderTextColor={colors.textSecondary}
               value={chatInput}
               onChangeText={setChatInput}
             />
             <TouchableOpacity
-              style={styles.sendBtn}
+              style={styles.sendIconBtn}
               onPress={handleSendMessage}
               activeOpacity={0.8}
             >
-              <Ionicons name="send" size={18} color={colors.textInverse} />
+              <Ionicons name="send" size={18} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
         </SafeAreaView>
@@ -313,53 +326,52 @@ const styles = StyleSheet.create({
   turnBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.primaryDark,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    gap: spacing.sm,
   },
   turnIconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.primary,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.secondary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.md,
   },
   turnInfoCol: {
     flex: 1,
   },
   turnDistance: {
-    ...typography.caption,
-    color: '#93C5FD',
-    fontWeight: '700',
-    textTransform: 'uppercase',
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
   turnInstruction: {
-    ...typography.subtitle1,
-    color: colors.textInverse,
-    fontWeight: '800',
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.85)',
+    marginTop: 1,
   },
   speedPill: {
-    backgroundColor: '#1E293B',
-    paddingHorizontal: spacing.md,
-    paddingVertical: 4,
-    borderRadius: borderRadius.md,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
     alignItems: 'center',
   },
   speedText: {
-    ...typography.subtitle2,
-    color: colors.textInverse,
+    fontSize: 14,
     fontWeight: '800',
+    color: colors.primary,
   },
   speedUnit: {
-    ...typography.caption,
-    color: '#94A3B8',
-    fontSize: 9,
+    fontSize: 8,
+    color: colors.textSecondary,
+    fontWeight: '700',
   },
   mapArea: {
     flex: 1,
-    backgroundColor: '#E0F2FE', // Soft map-like sky/water tint
+    backgroundColor: '#EAF0FC',
     position: 'relative',
     overflow: 'hidden',
   },
@@ -368,169 +380,172 @@ const styles = StyleSheet.create({
     top: '30%',
     left: 0,
     right: 0,
-    height: 36,
-    backgroundColor: '#F1F5F9',
-    transform: [{ rotate: '-8deg' }],
+    height: 1,
+    backgroundColor: '#D6E2F7',
   },
   mapGridHorizontal2: {
     position: 'absolute',
-    top: '60%',
+    top: '65%',
     left: 0,
     right: 0,
-    height: 48,
-    backgroundColor: '#FFFFFF',
-    transform: [{ rotate: '12deg' }],
+    height: 1,
+    backgroundColor: '#D6E2F7',
   },
   mapGridVertical1: {
     position: 'absolute',
-    left: '25%',
+    left: '35%',
     top: 0,
     bottom: 0,
-    width: 38,
-    backgroundColor: '#FFFFFF',
+    width: 1,
+    backgroundColor: '#D6E2F7',
   },
   mapGridVertical2: {
     position: 'absolute',
     left: '70%',
     top: 0,
     bottom: 0,
-    width: 32,
-    backgroundColor: '#F1F5F9',
+    width: 1,
+    backgroundColor: '#D6E2F7',
   },
   routeContainer: {
-    position: 'absolute',
-    top: 40,
-    bottom: 100,
-    left: 40,
-    right: 40,
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  roadTrack: {
-    width: 8,
     flex: 1,
-    backgroundColor: 'rgba(59, 130, 246, 0.25)',
-    borderRadius: 4,
-    position: 'relative',
-    marginVertical: 10,
-  },
-  roadProgressTrack: {
-    width: 8,
-    height: '60%',
-    backgroundColor: colors.primary,
-    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   workerPin: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    position: 'absolute',
+    bottom: '22%',
+    left: '28%',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'relative',
-    ...shadows.md,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    zIndex: 10,
   },
   workerPulseCircle: {
     position: 'absolute',
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(37, 99, 235, 0.25)',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(36, 84, 214, 0.25)',
+  },
+  roadTrack: {
+    position: 'absolute',
+    bottom: '26%',
+    left: '33%',
+    width: '42%',
+    height: 140,
+    borderTopWidth: 5,
+    borderRightWidth: 5,
+    borderColor: '#FFFFFF',
+    borderTopRightRadius: 60,
+  },
+  roadProgressTrack: {
+    width: '100%',
+    height: '100%',
+    borderTopWidth: 5,
+    borderRightWidth: 5,
+    borderColor: colors.primary,
+    borderTopRightRadius: 60,
   },
   destinationPin: {
+    position: 'absolute',
+    top: '25%',
+    right: '22%',
     alignItems: 'center',
   },
   destBadge: {
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: borderRadius.md,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: borderRadius.full,
     borderWidth: 1,
     borderColor: colors.border,
-    ...shadows.sm,
+    marginTop: 2,
   },
   destBadgeText: {
-    ...typography.caption,
-    color: colors.textPrimary,
-    fontWeight: '700',
     fontSize: 10,
+    fontWeight: '700',
+    color: colors.textPrimary,
   },
   mapControls: {
     position: 'absolute',
-    top: spacing.lg,
-    right: spacing.lg,
-    gap: spacing.sm,
+    top: 12,
+    right: 12,
+    gap: 8,
   },
   mapBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.surface,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    ...shadows.md,
+    ...shadows.sm,
   },
   etaFloatingBar: {
     position: 'absolute',
-    bottom: spacing.lg,
-    left: spacing.lg,
-    right: spacing.lg,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
+    bottom: 12,
+    left: 12,
+    right: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    ...shadows.md,
+    backgroundColor: '#FFFFFF',
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    ...shadows.sm,
   },
   etaCol: {
     flex: 1,
   },
   etaValue: {
-    ...typography.h3,
-    color: colors.success,
+    fontSize: 20,
     fontWeight: '800',
+    color: colors.primary,
   },
   etaLabel: {
-    ...typography.caption,
+    fontSize: 11,
     color: colors.textSecondary,
-    marginTop: 2,
+    marginTop: 1,
   },
   etaDivider: {
     width: 1,
-    height: 32,
-    backgroundColor: colors.borderLight,
+    height: 30,
+    backgroundColor: colors.border,
     marginHorizontal: spacing.md,
   },
   arrivalCol: {
     alignItems: 'flex-end',
   },
   arrivalLabel: {
-    ...typography.caption,
-    color: colors.textMuted,
     fontSize: 11,
+    color: colors.textSecondary,
   },
   arrivalValue: {
-    ...typography.subtitle2,
-    color: colors.textPrimary,
+    fontSize: 15,
     fontWeight: '700',
+    color: colors.textPrimary,
+    marginTop: 1,
   },
   bottomCard: {
-    backgroundColor: colors.surface,
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: borderRadius.xl,
     borderTopRightRadius: borderRadius.xl,
-    padding: spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
-    ...shadows.lg,
+    padding: spacing.md,
+    paddingBottom: spacing.lg,
+    ...shadows.md,
   },
   dragPill: {
     width: 36,
     height: 4,
-    backgroundColor: colors.borderDark,
     borderRadius: 2,
+    backgroundColor: colors.border,
     alignSelf: 'center',
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   customerRow: {
     flexDirection: 'row',
@@ -538,114 +553,109 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   customerAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: colors.surfaceAlt,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.primaryLight,
   },
   customerMeta: {
     flex: 1,
-    marginLeft: spacing.md,
+    marginLeft: spacing.sm,
   },
   customerName: {
-    ...typography.subtitle1,
+    fontSize: 15,
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   jobType: {
-    ...typography.caption,
+    fontSize: 12,
     color: colors.primary,
     fontWeight: '600',
   },
   locationText: {
-    ...typography.caption,
+    fontSize: 11,
     color: colors.textSecondary,
     marginTop: 1,
   },
   actionButtonsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   circleActionButton: {
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surfaceAlt,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    borderRadius: borderRadius.md,
-    minWidth: 80,
+    gap: 4,
   },
   circleActionText: {
-    ...typography.caption,
+    fontSize: 11,
+    fontWeight: '600',
     color: colors.textPrimary,
-    fontWeight: '700',
-    marginTop: 4,
-  },
-  arrivedBtn: {
-    marginTop: spacing.xs,
   },
   chatModalContainer: {
     flex: 1,
     backgroundColor: colors.background,
   },
-  chatMessagesContainer: {
+  chatScroll: {
     flex: 1,
-    padding: spacing.lg,
   },
-  messageBubble: {
-    maxWidth: '75%',
+  chatBubble: {
+    maxWidth: '80%',
     padding: spacing.md,
     borderRadius: borderRadius.lg,
     marginBottom: spacing.sm,
   },
-  workerBubble: {
-    backgroundColor: colors.primary,
+  chatBubbleWorker: {
     alignSelf: 'flex-end',
-    borderBottomRightRadius: 4,
+    backgroundColor: colors.primary,
   },
-  customerBubble: {
-    backgroundColor: colors.surface,
+  chatBubbleCustomer: {
     alignSelf: 'flex-start',
-    borderBottomLeftRadius: 4,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: colors.border,
   },
-  messageText: {
-    ...typography.body2,
+  chatText: {
+    fontSize: 13,
     lineHeight: 18,
   },
-  workerMsgText: {
-    color: colors.textInverse,
+  chatTextWorker: {
+    color: '#FFFFFF',
   },
-  customerMsgText: {
+  chatTextCustomer: {
     color: colors.textPrimary,
   },
-  msgTime: {
-    ...typography.caption,
+  chatTimeText: {
     fontSize: 10,
-    color: '#94A3B8',
-    alignSelf: 'flex-end',
     marginTop: 4,
+  },
+  chatTimeWorker: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'right',
+  },
+  chatTimeCustomer: {
+    color: colors.textSecondary,
   },
   chatInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
-    backgroundColor: colors.surface,
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
+    borderTopColor: colors.border,
+    gap: spacing.sm,
   },
   chatTextInput: {
     flex: 1,
-    backgroundColor: colors.surfaceAlt,
+    height: 44,
+    backgroundColor: colors.background,
     borderRadius: borderRadius.full,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm + 2,
-    ...typography.body2,
+    paddingHorizontal: spacing.md,
+    fontSize: 13,
     color: colors.textPrimary,
-    marginRight: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  sendBtn: {
+  sendIconBtn: {
     width: 44,
     height: 44,
     borderRadius: 22,

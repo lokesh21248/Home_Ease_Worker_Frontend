@@ -59,7 +59,17 @@ export const JobCard: React.FC<JobCardProps> = ({
         <View style={styles.headerLeft}>
           <Text style={styles.jobIdText}>{job.jobId}</Text>
           <View style={styles.dotSeparator} />
-          <Text style={styles.scheduleText}>
+          {job.bookingType === 'INSTANT' ? (
+            <View style={styles.instantPill}>
+              <Text style={styles.instantPillText}>⚡ Instant ({job.estimatedArrivalMinutes || 18}m ETA)</Text>
+            </View>
+          ) : (
+            <View style={styles.scheduledPill}>
+              <Text style={styles.scheduledPillText}>📅 Scheduled</Text>
+            </View>
+          )}
+          <View style={styles.dotSeparator} />
+          <Text style={styles.scheduleText} numberOfLines={1}>
             {job.scheduledDate}, {job.scheduledTime}
           </Text>
         </View>
@@ -201,6 +211,32 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: colors.primary,
     letterSpacing: 0.5,
+  },
+  instantPill: {
+    backgroundColor: '#FFF7ED',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#FDBA74',
+  },
+  instantPillText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#C2410C',
+  },
+  scheduledPill: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#93C5FD',
+  },
+  scheduledPillText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#1D4ED8',
   },
   dotSeparator: {
     width: 4,

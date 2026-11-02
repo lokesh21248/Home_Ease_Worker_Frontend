@@ -8,6 +8,8 @@
  * handles token generation, background/foreground event callbacks, and topic subscriptions.
  */
 
+import { workerApiService } from '../api/workerApiService';
+
 export interface RemoteMessage {
   messageId: string;
   notification?: {
@@ -37,6 +39,9 @@ class FCMService {
    * Fetch device registration token for push delivery
    */
   public async getFCMToken(): Promise<string> {
+    try {
+      await workerApiService.updateFcmToken(this.fcmToken);
+    } catch (err) {}
     return this.fcmToken;
   }
 

@@ -3,18 +3,18 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   Switch,
   TouchableOpacity,
   Modal,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme/colors';
 import { borderRadius, shadows, spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-import Header from '../../components/Header';
-import Button from '../../components/Button';
+import { CustomHeader } from '../../components/CustomHeader';
+import { PremiumCard } from '../../components/PremiumCard';
 import { useApp } from '../../state/AppContext';
 
 const LANGUAGES = [
@@ -32,79 +32,88 @@ export const SettingsScreen: React.FC = () => {
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header title="Settings & Preferences" subtitle="Customise application behavior" showBack />
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <CustomHeader
+        title="Settings & Preferences"
+        subtitle="Customise partner application behavior"
+        showBack
+      />
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Notifications Section */}
-        <View style={styles.card}>
+        <PremiumCard style={styles.card}>
           <Text style={styles.sectionTitle}>Notification Alerts</Text>
 
           <View style={styles.settingRow}>
             <View style={styles.settingTextCol}>
               <Text style={styles.settingLabel}>Job Dispatches & Requests</Text>
-              <Text style={styles.settingSub}>Instant pop-up alert for nearby customer leads</Text>
+              <Text style={styles.settingSub}>Instant pop-up alert for nearby customer bookings</Text>
             </View>
             <Switch
               value={settings.pushNotifications}
               onValueChange={(val) => updateSettings({ pushNotifications: val })}
               trackColor={{ false: colors.borderDark, true: colors.primary }}
-              thumbColor={colors.surface}
+              thumbColor="#FFFFFF"
             />
           </View>
 
           <View style={styles.settingRow}>
             <View style={styles.settingTextCol}>
-              <Text style={styles.settingLabel}>Loud Siren Ring for New Jobs</Text>
-              <Text style={styles.settingSub}>Plays high volume sound even in pocket</Text>
+              <Text style={styles.settingLabel}>Loud Alert for New Jobs</Text>
+              <Text style={styles.settingSub}>Plays notification ring even when phone is locked</Text>
             </View>
             <Switch
               value={settings.soundAlerts}
               onValueChange={(val) => updateSettings({ soundAlerts: val })}
               trackColor={{ false: colors.borderDark, true: colors.primary }}
-              thumbColor={colors.surface}
+              thumbColor="#FFFFFF"
             />
           </View>
 
           <View style={[styles.settingRow, { borderBottomWidth: 0 }]}>
             <View style={styles.settingTextCol}>
               <Text style={styles.settingLabel}>SMS Payout Confirmations</Text>
-              <Text style={styles.settingSub}>Receive text message when wallet funds are transferred</Text>
+              <Text style={styles.settingSub}>Receive SMS when wallet funds are transferred</Text>
             </View>
             <Switch
               value={settings.smsUpdates}
               onValueChange={(val) => updateSettings({ smsUpdates: val })}
               trackColor={{ false: colors.borderDark, true: colors.primary }}
-              thumbColor={colors.surface}
+              thumbColor="#FFFFFF"
             />
           </View>
-        </View>
+        </PremiumCard>
 
         {/* Display & Appearance */}
-        <View style={styles.card}>
+        <PremiumCard style={styles.card}>
           <Text style={styles.sectionTitle}>Appearance & Theme</Text>
 
           <View style={[styles.settingRow, { borderBottomWidth: 0 }]}>
             <View style={styles.settingTextCol}>
-              <Text style={styles.settingLabel}>Dark Mode (OLED Saver)</Text>
-              <Text style={styles.settingSub}>Reduces battery drain during long shifts</Text>
+              <Text style={styles.settingLabel}>Dark Theme</Text>
+              <Text style={styles.settingSub}>Reduces screen brightness during evening shifts</Text>
             </View>
             <Switch
               value={settings.darkMode}
               onValueChange={(val) => updateSettings({ darkMode: val })}
               trackColor={{ false: colors.borderDark, true: colors.primary }}
-              thumbColor={colors.surface}
+              thumbColor="#FFFFFF"
             />
           </View>
-        </View>
+        </PremiumCard>
 
         {/* Language Selection */}
-        <View style={styles.card}>
+        <PremiumCard style={styles.card}>
           <Text style={styles.sectionTitle}>App Language</Text>
           <Text style={styles.cardSub}>Choose your preferred language for prompts and labels:</Text>
 
           {LANGUAGES.map((lang) => {
-            const isSelected = settings.language === lang.name || settings.language.startsWith(lang.name.split(' ')[0]);
+            const isSelected =
+              settings.language === lang.name ||
+              settings.language.startsWith(lang.name.split(' ')[0]);
 
             return (
               <TouchableOpacity
@@ -119,15 +128,15 @@ export const SettingsScreen: React.FC = () => {
                 <View
                   style={[styles.radioCircle, isSelected && styles.radioCircleSelected]}
                 >
-                  {isSelected && <View style={styles.radioDot} />}
+                  {isSelected ? <View style={styles.radioDot} /> : null}
                 </View>
               </TouchableOpacity>
             );
           })}
-        </View>
+        </PremiumCard>
 
         {/* Legal & Policy Links */}
-        <View style={styles.card}>
+        <PremiumCard style={styles.card}>
           <Text style={styles.sectionTitle}>Legal & Compliance</Text>
 
           <TouchableOpacity
@@ -136,10 +145,10 @@ export const SettingsScreen: React.FC = () => {
             onPress={() => setIsPrivacyModalOpen(true)}
           >
             <View style={styles.legalLeft}>
-              <Ionicons name="lock-closed-outline" size={20} color={colors.primary} />
+              <Ionicons name="lock-closed-outline" size={18} color={colors.primary} />
               <Text style={styles.legalLabel}>Privacy Policy & Data Security</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -148,38 +157,38 @@ export const SettingsScreen: React.FC = () => {
             onPress={() => setIsTermsModalOpen(true)}
           >
             <View style={styles.legalLeft}>
-              <Ionicons name="document-text-outline" size={20} color={colors.primary} />
-              <Text style={styles.legalLabel}>Partner Terms of Agreement</Text>
+              <Ionicons name="document-text-outline" size={18} color={colors.primary} />
+              <Text style={styles.legalLabel}>Partner Terms of Service</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
           </TouchableOpacity>
-        </View>
+        </PremiumCard>
       </ScrollView>
 
       {/* Privacy Policy Modal */}
       <Modal visible={isPrivacyModalOpen} animationType="slide">
-        <SafeAreaView style={styles.modalView}>
-          <Header
+        <SafeAreaView style={styles.modalView} edges={['top']}>
+          <CustomHeader
             title="Privacy Policy"
             showBack
             onBack={() => setIsPrivacyModalOpen(false)}
           />
           <ScrollView style={styles.modalBody}>
-            <Text style={styles.legalDocTitle}>HomeEase Worker Data & Privacy Protection</Text>
+            <Text style={styles.legalDocTitle}>HomeEase Partner Data Protection</Text>
             <Text style={styles.legalParagraph}>
-              Last updated: September 2026. HomeEase operates with highest industry security
-              standards for partner KYC and banking data.
+              HomeEase operates with strict bank-grade standards for partner KYC and payout
+              information.
             </Text>
             <Text style={styles.legalSubhead}>1. GPS & Location Services</Text>
             <Text style={styles.legalParagraph}>
-              Location data is gathered only while your duty toggle is set to ONLINE. It is used
-              strictly for matching customers within your operational radius and calculating accurate
-              travel ETA.
+              Location data is gathered only while your duty switch is set to ONLINE. It is used
+              strictly for matching customer bookings within your operational radius and providing
+              turn-by-turn routing.
             </Text>
             <Text style={styles.legalSubhead}>2. Payment & KYC Data</Text>
             <Text style={styles.legalParagraph}>
               Bank account numbers and Aadhaar documents are stored under encrypted tokens and used
-              only for statutory compliance and direct IMPS transfers.
+              only for statutory partner verification and IMPS payouts.
             </Text>
           </ScrollView>
         </SafeAreaView>
@@ -187,27 +196,22 @@ export const SettingsScreen: React.FC = () => {
 
       {/* Terms Modal */}
       <Modal visible={isTermsModalOpen} animationType="slide">
-        <SafeAreaView style={styles.modalView}>
-          <Header
-            title="Partner Terms of Service"
+        <SafeAreaView style={styles.modalView} edges={['top']}>
+          <CustomHeader
+            title="Terms of Service"
             showBack
             onBack={() => setIsTermsModalOpen(false)}
           />
           <ScrollView style={styles.modalBody}>
             <Text style={styles.legalDocTitle}>HomeEase Partner Code of Conduct</Text>
             <Text style={styles.legalParagraph}>
-              By registering as a service pro on HomeEase Worker, you agree to uphold our professional
-              service standards, punctuality, and verified hygiene protocols.
+              By registering as a service partner on HomeEase Worker, you agree to uphold our
+              professional service standards, punctuality, and verified hygiene protocols.
             </Text>
-            <Text style={styles.legalSubhead}>1. Service Integrity</Text>
+            <Text style={styles.legalSubhead}>1. Service Excellence</Text>
             <Text style={styles.legalParagraph}>
-              Partners must not solicit direct off-platform payments from customers acquired via the
-              platform.
-            </Text>
-            <Text style={styles.legalSubhead}>2. Safety & Identity Verification</Text>
-            <Text style={styles.legalParagraph}>
-              Only verified registered professionals are permitted on customer premises during
-              service fulfillment.
+              All booked jobs must be fulfilled with certified tooling and genuine replacement
+              parts. Doorstep security PINs must be validated before starting any service.
             </Text>
           </ScrollView>
         </SafeAreaView>
@@ -222,62 +226,57 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   scrollContent: {
-    padding: spacing.lg,
+    padding: spacing.md,
     paddingBottom: spacing.xxl,
   },
   card: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
     marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    ...shadows.sm,
   },
   sectionTitle: {
-    ...typography.subtitle1,
-    color: colors.textPrimary,
+    fontSize: 15,
     fontWeight: '700',
+    color: colors.textPrimary,
     marginBottom: spacing.md,
   },
   cardSub: {
-    ...typography.caption,
+    fontSize: 12,
     color: colors.textSecondary,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   settingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm + 2,
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
+    borderBottomColor: colors.border,
   },
   settingTextCol: {
     flex: 1,
-    marginRight: spacing.md,
+    paddingRight: spacing.md,
   },
   settingLabel: {
-    ...typography.subtitle2,
+    fontSize: 14,
+    fontWeight: '600',
     color: colors.textPrimary,
   },
   settingSub: {
-    ...typography.caption,
+    fontSize: 12,
     color: colors.textSecondary,
     marginTop: 2,
-    lineHeight: 16,
   },
   langRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: spacing.md,
+    paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
+    borderBottomColor: colors.border,
   },
   langName: {
-    ...typography.body1,
+    fontSize: 14,
     color: colors.textPrimary,
+    fontWeight: '500',
   },
   langNameSelected: {
     color: colors.primary,
@@ -288,7 +287,7 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: colors.borderDark,
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -305,9 +304,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: spacing.md,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
+    borderBottomColor: colors.border,
   },
   legalLeft: {
     flexDirection: 'row',
@@ -315,33 +314,35 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   legalLabel: {
-    ...typography.body2,
-    color: colors.textPrimary,
+    fontSize: 14,
     fontWeight: '500',
+    color: colors.textPrimary,
   },
   modalView: {
     flex: 1,
     backgroundColor: colors.background,
   },
   modalBody: {
-    padding: spacing.xl,
+    padding: spacing.lg,
   },
   legalDocTitle: {
-    ...typography.h2,
+    fontSize: 18,
+    fontWeight: '800',
     color: colors.textPrimary,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   legalSubhead: {
-    ...typography.subtitle1,
-    color: colors.primary,
-    fontWeight: '800',
-    marginTop: spacing.lg,
-    marginBottom: spacing.xs,
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginTop: spacing.md,
+    marginBottom: 4,
   },
   legalParagraph: {
-    ...typography.body2,
+    fontSize: 13,
     color: colors.textSecondary,
-    lineHeight: 22,
+    lineHeight: 20,
+    marginBottom: spacing.sm,
   },
 });
 

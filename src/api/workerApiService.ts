@@ -1,6 +1,7 @@
 import apiClient from './client';
 import { API_ENDPOINTS } from './endpoints';
-import { resolveBookingUuid } from '../utils/uuid';
+import { resolveBookingUuid, isValidUuid } from '../utils/uuid';
+import { DaySchedule, TimeOffItem, WorkerScheduleSlot, WorkerTodaySchedule } from '../types';
 
 export interface VerifyOtpResponse {
   token: string;
@@ -85,6 +86,8 @@ export interface EarningsOverviewResponse {
  * Implements end-to-end HTTP integration for all endpoints in the HomeEase Worker Partner guide.
  */
 class WorkerApiService {
+  private profilePromise: Promise<any> | null = null;
+
   // ==========================================
   // 1. Worker Auth & Registration
   // ==========================================
@@ -101,7 +104,6 @@ class WorkerApiService {
       };
     } catch (error: any) {
       console.warn('[WorkerApi] sendOtp network notice:', error?.message);
-      // Re-throw so caller knows, but provides standard message
       throw new Error(error?.message || 'Failed to send OTP. Please check your network.');
     }
   }
@@ -111,19 +113,20 @@ class WorkerApiService {
    */
   public async verifyOtp(phoneNumber: string, otpCode: string): Promise<VerifyOtpResponse> {
     try {
-      const response = await apiClient.post<VerifyOtpResponse>(API_ENDPOINTS.AUTH.VERIFY_OTP, {
+      const response = await apiClient.post<any>(API_ENDPOINTS.AUTH.VERIFY_OTP, {
         phoneNumber,
         otpCode,
       });
 
-      if (response.data?.token) {
-        apiClient.setAuthToken(response.data.token);
+      const data = response.data?.data || response.data;
+      if (data?.token) {
+        apiClient.setAuthToken(data.token);
       }
-      if (response.data?.userId) {
-        apiClient.setUserId(response.data.userId);
+      if (data?.userId) {
+        apiClient.setUserId(data.userId);
       }
 
-      return response.data;
+      return data;
     } catch (error: any) {
       console.warn('[WorkerApi] verifyOtp network notice:', error?.message);
       throw new Error(error?.message || 'Invalid OTP code.');
@@ -155,8 +158,22 @@ class WorkerApiService {
     fileUri: string,
     fileName: string = 'avatar.jpg'
   ): Promise<UploadDocResponse> {
+    const validWorkerId = isValidUuid(workerId)
+      ? workerId
+      : (apiClient.getUserId() || '9aaff45e-1baf-4f39-b26f-2fcd2b438f5b');
+
+    if (!fileUri || fileUri.startsWith('file://mock') || fileUri.startsWith('http')) {
+      const shortId = validWorkerId.slice(0, 8);
+      return {
+        url: fileUri.startsWith('http')
+          ? fileUri
+          : `https://gheiuyygjssqatziviix.supabase.co/storage/v1/object/public/homeease-worker-profile/${shortId}_avatar.png`,
+        bucket: 'homeease-worker-profile',
+      };
+    }
+
     try {
-      const url = API_ENDPOINTS.UPLOAD.WORKER_AVATAR(workerId);
+      const url = API_ENDPOINTS.UPLOAD.WORKER_AVATAR(validWorkerId);
       const response = await apiClient.uploadFile<UploadDocResponse>(
         url,
         fileUri,
@@ -164,15 +181,10 @@ class WorkerApiService {
         fileName,
         'image/jpeg'
       );
-      return response.data;
+      return (response.data as any)?.data ?? response.data;
     } catch (error: any) {
-      console.warn('[WorkerApi] uploadWorkerProfilePhoto notice:', error?.message);
-      // Fallback sample url from backend guide if remote offline
-      const shortId = workerId.slice(0, 8);
-      return {
-        url: `https://gheiuyygjssqatziviix.supabase.co/storage/v1/object/public/homeease-worker-profile/${shortId}_avatar.png`,
-        bucket: 'homeease-worker-profile',
-      };
+      console.warn('[WorkerApi] uploadWorkerProfilePhoto failed:', error?.message);
+      throw error;
     }
   }
 
@@ -184,8 +196,21 @@ class WorkerApiService {
     fileUri: string,
     fileName: string = 'pan_document.png'
   ): Promise<UploadDocResponse> {
+    const validWorkerId = isValidUuid(workerId)
+      ? workerId
+      : (apiClient.getUserId() || '9aaff45e-1baf-4f39-b26f-2fcd2b438f5b');
+
+    if (!fileUri || fileUri.startsWith('file://mock') || fileUri.startsWith('http')) {
+      return {
+        url: fileUri.startsWith('http')
+          ? fileUri
+          : `https://gheiuyygjssqatziviix.supabase.co/storage/v1/object/public/homeease-worker-kyc/pan/${validWorkerId}/pan_${Date.now()}.png`,
+        bucket: 'homeease-worker-kyc',
+      };
+    }
+
     try {
-      const url = API_ENDPOINTS.UPLOAD.PAN_DOC(workerId);
+      const url = API_ENDPOINTS.UPLOAD.PAN_DOC(validWorkerId);
       const response = await apiClient.uploadFile<UploadDocResponse>(
         url,
         fileUri,
@@ -193,14 +218,10 @@ class WorkerApiService {
         fileName,
         'image/png'
       );
-      return response.data;
+      return (response.data as any)?.data ?? response.data;
     } catch (error: any) {
-      console.warn('[WorkerApi] uploadPanDocument notice:', error?.message);
-      const shortId = workerId.slice(0, 8);
-      return {
-        url: `https://gheiuyygjssqatziviix.supabase.co/storage/v1/object/public/homeease-worker-kyc/pan-docs/${shortId}_pan.png`,
-        bucket: 'homeease-worker-kyc',
-      };
+      console.warn('[WorkerApi] uploadPanDocument failed:', error?.message);
+      throw error;
     }
   }
 
@@ -212,8 +233,21 @@ class WorkerApiService {
     fileUri: string,
     fileName: string = 'aadhaar_document.png'
   ): Promise<UploadDocResponse> {
+    const validWorkerId = isValidUuid(workerId)
+      ? workerId
+      : (apiClient.getUserId() || '9aaff45e-1baf-4f39-b26f-2fcd2b438f5b');
+
+    if (!fileUri || fileUri.startsWith('file://mock') || fileUri.startsWith('http')) {
+      return {
+        url: fileUri.startsWith('http')
+          ? fileUri
+          : `https://gheiuyygjssqatziviix.supabase.co/storage/v1/object/public/homeease-worker-kyc/aadhaar/${validWorkerId}/aadhaar_${Date.now()}.png`,
+        bucket: 'homeease-worker-kyc',
+      };
+    }
+
     try {
-      const url = API_ENDPOINTS.UPLOAD.AADHAAR_DOC(workerId);
+      const url = API_ENDPOINTS.UPLOAD.AADHAAR_DOC(validWorkerId);
       const response = await apiClient.uploadFile<UploadDocResponse>(
         url,
         fileUri,
@@ -221,14 +255,10 @@ class WorkerApiService {
         fileName,
         'image/png'
       );
-      return response.data;
+      return (response.data as any)?.data ?? response.data;
     } catch (error: any) {
-      console.warn('[WorkerApi] uploadAadhaarDocument notice:', error?.message);
-      const shortId = workerId.slice(0, 8);
-      return {
-        url: `https://gheiuyygjssqatziviix.supabase.co/storage/v1/object/public/homeease-worker-kyc/aadhaar-docs/${shortId}_aadhaar.png`,
-        bucket: 'homeease-worker-kyc',
-      };
+      console.warn('[WorkerApi] uploadAadhaarDocument failed:', error?.message);
+      throw error;
     }
   }
 
@@ -236,26 +266,31 @@ class WorkerApiService {
    * 2.2 Submit Full KYC Details & Skill Tags: POST /workers/register-kyc
    */
   public async registerKyc(data: KycRegistrationPayload): Promise<KycRegistrationResponse> {
+    const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
     try {
       const response = await apiClient.post<any>(
         API_ENDPOINTS.WORKER.REGISTER_KYC,
-        data
+        { ...data, userId: activeUserId },
+        {
+          headers: { 'X-User-Id': activeUserId },
+          params: { userId: activeUserId },
+        }
       );
-      const resData = response.data;
+      const resData = (response.data as any)?.data ?? response.data;
       return {
-        workerId: resData?.workerId || apiClient.getUserId() || '6f2e1a3b-4c5d-6e7f-6a9b-1c2d3e4f5a6b',
+        workerId: resData?.workerId || activeUserId,
         isVerified: resData?.isVerified ?? false,
         isOnline: resData?.isOnline ?? false,
-        rating: resData?.rating ?? 4.9,
+        rating: resData?.rating ?? 5.0,
         jobsCompleted: resData?.jobsCompleted ?? 0,
       };
     } catch (error: any) {
       console.warn('[WorkerApi] registerKyc notice:', error?.message);
       return {
-        workerId: apiClient.getUserId() || '6f2e1a3b-4c5d-6e7f-6a9b-1c2d3e4f5a6b',
+        workerId: activeUserId,
         isVerified: false,
         isOnline: false,
-        rating: 4.9,
+        rating: 5.0,
         jobsCompleted: 0,
       };
     }
@@ -264,13 +299,63 @@ class WorkerApiService {
   /**
    * 2.3 Get Worker Profile: GET /workers/profile
    */
-  public async getWorkerProfile(): Promise<any> {
+  public getWorkerProfile(): Promise<any> {
+    if (this.profilePromise) {
+      return this.profilePromise;
+    }
+
+    this.profilePromise = (async () => {
+      try {
+        const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
+        const response = await apiClient.get(API_ENDPOINTS.WORKER.PROFILE, {
+          headers: {
+            'X-User-Id': activeUserId,
+          },
+          params: {
+            userId: activeUserId,
+          },
+        });
+        return (response.data as any)?.data ?? response.data;
+      } catch (error: any) {
+        const status: number | undefined = error?.status ?? error?.response?.status;
+        if (status === 404) {
+          return null;
+        }
+        console.warn('[WorkerApi] getWorkerProfile error:', status, error?.message);
+        throw error;
+      } finally {
+        this.profilePromise = null;
+      }
+    })();
+
+    return this.profilePromise;
+  }
+
+  /**
+   * 2.4 Get Active Services Catalog: GET /services
+   */
+  public async getServices(): Promise<any[]> {
     try {
-      const response = await apiClient.get(API_ENDPOINTS.WORKER.PROFILE);
-      return response.data;
+      const response = await apiClient.get<any[]>(API_ENDPOINTS.WORKER.SERVICES);
+      const data = (response.data as any)?.data ?? response.data;
+      return Array.isArray(data) ? data : [];
     } catch (error: any) {
-      console.warn('[WorkerApi] getWorkerProfile notice:', error?.message);
-      return null;
+      return [];
+    }
+  }
+
+  /**
+   * 2.5 Get Sub-Services for a Service: GET /services/{serviceId}/sub-services
+   */
+  public async getSubServices(serviceId: string): Promise<any[]> {
+    if (!serviceId) return [];
+    try {
+      const url = API_ENDPOINTS.WORKER.SUB_SERVICES(serviceId);
+      const response = await apiClient.get<any[]>(url);
+      const data = (response.data as any)?.data ?? response.data;
+      return Array.isArray(data) ? data : [];
+    } catch (error: any) {
+      return [];
     }
   }
 
@@ -282,11 +367,28 @@ class WorkerApiService {
    * 3.1 Toggle Duty (Go Online / Offline): POST /workers/status
    */
   public async updateDutyStatus(isOnline: boolean): Promise<DutyStatusResponse> {
+    const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
     try {
-      const response = await apiClient.post<DutyStatusResponse>(API_ENDPOINTS.WORKER.STATUS, {
-        isOnline,
-      });
-      return response.data;
+      const response = await apiClient.post<any>(
+        API_ENDPOINTS.WORKER.STATUS,
+        {
+          isOnline,
+          userId: activeUserId,
+        },
+        {
+          headers: {
+            'X-User-Id': activeUserId,
+          },
+          params: {
+            userId: activeUserId,
+          },
+        }
+      );
+      const data = (response.data as any)?.data ?? response.data;
+      return {
+        workerId: data?.workerId || activeUserId,
+        isOnline: data?.isOnline ?? isOnline,
+      };
     } catch (error: any) {
       const errorMsg =
         error?.response?.data?.message ||
@@ -302,13 +404,25 @@ class WorkerApiService {
    * 3.2 GPS Location Heartbeat Ping: POST /workers/location
    */
   public async sendLocationHeartbeat(lat: number, lng: number): Promise<string> {
+    const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
     try {
-      const response = await apiClient.post(API_ENDPOINTS.WORKER.LOCATION, { lat, lng });
-      return typeof response.data === 'string' ? response.data : 'Worker live location updated successfully.';
+      const response = await apiClient.post(
+        API_ENDPOINTS.WORKER.LOCATION,
+        { lat, lng, userId: activeUserId },
+        {
+          headers: { 'X-User-Id': activeUserId },
+          params: { userId: activeUserId },
+        }
+      );
+      const data = (response.data as any)?.message || response.data;
+      return typeof data === 'string' ? data : 'Worker live location updated successfully.';
     } catch (error: any) {
-      // Background heartbeat - quietly record without interrupting UX
       return 'Worker live location updated successfully.';
     }
+  }
+
+  public async updateLiveLocation(lat: number, lng: number): Promise<string> {
+    return this.sendLocationHeartbeat(lat, lng);
   }
 
   // ==========================================
@@ -319,14 +433,15 @@ class WorkerApiService {
    * 4.0 Get Live Job Dispatch Requests: GET /workers/bookings/requests
    */
   public async getJobRequests(): Promise<any[]> {
+    const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
     try {
-      const response = await apiClient.get<any[]>(API_ENDPOINTS.BOOKINGS.REQUESTS);
-      if (Array.isArray(response.data)) {
-        return response.data;
-      }
-      return [];
+      const response = await apiClient.get<any[]>(API_ENDPOINTS.BOOKINGS.REQUESTS, {
+        headers: { 'X-User-Id': activeUserId },
+        params: { userId: activeUserId },
+      });
+      const data = (response.data as any)?.data ?? response.data;
+      return Array.isArray(data) ? data : [];
     } catch (error: any) {
-      console.warn('[WorkerApi] getJobRequests notice:', error?.message);
       return [];
     }
   }
@@ -336,25 +451,21 @@ class WorkerApiService {
    */
   public async acceptBooking(bookingId: string): Promise<AcceptBookingResponse> {
     const resolvedBookingId = resolveBookingUuid(bookingId);
+    const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
     try {
       const url = API_ENDPOINTS.BOOKINGS.ACCEPT(resolvedBookingId);
-      const response = await apiClient.post<AcceptBookingResponse>(url);
-      return response.data;
+      const response = await apiClient.post<any>(
+        url,
+        { userId: activeUserId },
+        {
+          headers: { 'X-User-Id': activeUserId },
+          params: { userId: activeUserId },
+        }
+      );
+      return (response.data as any)?.data ?? response.data;
     } catch (error: any) {
-      console.warn('[WorkerApi] acceptBooking notice:', error?.message);
-      // Fallback response matching guide
-      return {
-        bookingId: resolvedBookingId,
-        status: 'ACCEPTED',
-        workerId: apiClient.getUserId() || '6f2e1a3b-4c5d-6e7f-6a9b-1c2d3e4f5a6b',
-        workerName: 'Ramesh Kumar',
-        workerPhone: '+919123456780',
-        userName: 'Rahul Sharma',
-        userPhone: '+919876543210',
-        userLat: 17.448293,
-        userLng: 78.374182,
-        totalAmount: 918.20,
-      };
+      console.warn('[WorkerApi] acceptBooking error:', error?.message);
+      throw error;
     }
   }
 
@@ -363,34 +474,46 @@ class WorkerApiService {
    */
   public async rejectBooking(bookingId: string, targetSubServiceId?: string): Promise<string> {
     const resolvedBookingId = resolveBookingUuid(bookingId);
+    const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
     try {
       const url = API_ENDPOINTS.BOOKINGS.REJECT(resolvedBookingId);
-      const params = targetSubServiceId ? { targetSubServiceId } : undefined;
-      const response = await apiClient.post(url, undefined, { params });
-      return typeof response.data === 'string'
-        ? response.data
-        : 'Booking request rejected. Account temporarily blocked for 1 hour.';
+      const response = await apiClient.post(
+        url,
+        { targetSubServiceId, userId: activeUserId },
+        {
+          headers: { 'X-User-Id': activeUserId },
+          params: { targetSubServiceId, userId: activeUserId },
+        }
+      );
+      const data = (response.data as any)?.message || response.data;
+      return typeof data === 'string'
+        ? data
+        : 'Booking request rejected.';
     } catch (error: any) {
-      console.warn('[WorkerApi] rejectBooking notice:', error?.message);
-      return 'Booking request rejected. Account temporarily blocked for 1 hour.';
+      return 'Booking request rejected.';
     }
   }
 
   /**
    * 4.3 Verify Customer PIN & Start Work: POST /workers/bookings/{bookingId}/verify-pin
-   * Body: {"pinCode": "4821"}
    */
   public async verifyBookingPin(
     bookingId: string,
     pinCode: string
   ): Promise<VerifyPinResponse> {
     const resolvedBookingId = resolveBookingUuid(bookingId);
+    const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
     const url = API_ENDPOINTS.BOOKINGS.VERIFY_PIN(resolvedBookingId);
 
-    const response = await apiClient.post<VerifyPinResponse>(url, {
-      pinCode: pinCode.trim(),
-    });
-    return response.data;
+    const response = await apiClient.post<any>(
+      url,
+      { pinCode: pinCode.trim(), userId: activeUserId },
+      {
+        headers: { 'X-User-Id': activeUserId },
+        params: { userId: activeUserId },
+      }
+    );
+    return (response.data as any)?.data ?? response.data;
   }
 
   /**
@@ -405,9 +528,8 @@ class WorkerApiService {
     try {
       const url = API_ENDPOINTS.BOOKINGS.ADD_SUB_SERVICE(resolvedBookingId);
       const response = await apiClient.post(url, { subServiceId, quantity });
-      return response.data;
+      return (response.data as any)?.data ?? response.data;
     } catch (error: any) {
-      console.warn('[WorkerApi] addSubService notice:', error?.message);
       return { success: true, bookingId: resolvedBookingId, subServiceId, quantity };
     }
   }
@@ -417,19 +539,34 @@ class WorkerApiService {
    */
   public async completeBooking(bookingId: string): Promise<CompleteBookingResponse> {
     const resolvedBookingId = resolveBookingUuid(bookingId);
+    const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
     try {
       const url = API_ENDPOINTS.BOOKINGS.COMPLETE(resolvedBookingId);
-      const response = await apiClient.post<CompleteBookingResponse>(url);
-      return response.data;
+      const response = await apiClient.post<any>(
+        url,
+        { userId: activeUserId },
+        {
+          headers: { 'X-User-Id': activeUserId },
+          params: { userId: activeUserId },
+        }
+      );
+      return (response.data as any)?.data ?? response.data;
     } catch (error: any) {
-      console.warn('[WorkerApi] completeBooking notice:', error?.message);
-      return {
-        bookingId: resolvedBookingId,
-        status: 'COMPLETED',
-        completedAt: new Date().toISOString(),
-        paymentStatus: 'COMPLETED',
-        totalAmount: 918.20,
-      };
+      console.warn('[WorkerApi] completeBooking error:', error?.message);
+      throw error;
+    }
+  }
+
+  /**
+   * 4.6 Get Single Booking Details: GET /bookings/{bookingId}
+   */
+  public async getBookingDetails(bookingId: string): Promise<any> {
+    const resolvedBookingId = resolveBookingUuid(bookingId);
+    try {
+      const response = await apiClient.get(API_ENDPOINTS.BOOKINGS.DETAILS(resolvedBookingId));
+      return (response.data as any)?.data ?? response.data;
+    } catch (error: any) {
+      return null;
     }
   }
 
@@ -441,20 +578,139 @@ class WorkerApiService {
    * 5.1 Get Earnings Overview: GET /workers/earnings
    */
   public async getEarnings(): Promise<EarningsOverviewResponse> {
+    const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
     try {
-      const response = await apiClient.get<EarningsOverviewResponse>(
-        API_ENDPOINTS.WORKER.EARNINGS
-      );
-      return response.data;
-    } catch (error: any) {
-      console.warn('[WorkerApi] getEarnings notice:', error?.message);
-      // Fallback matching response shape from guide
+      const response = await apiClient.get<any>(API_ENDPOINTS.WORKER.EARNINGS, {
+        headers: { 'X-User-Id': activeUserId },
+        params: { userId: activeUserId },
+      });
+      const data = (response.data as any)?.data ?? response.data;
       return {
-        totalEarnings: 12500.00,
-        totalCommissionPaid: 1875.00,
-        netPayout: 10625.00,
-        completedBookingsCount: 14,
+        totalEarnings: Number(data?.totalEarnings ?? 0),
+        totalCommissionPaid: Number(data?.totalCommissionPaid ?? 0),
+        netPayout: Number(data?.netPayout ?? 0),
+        completedBookingsCount: Number(data?.completedBookingsCount ?? 0),
       };
+    } catch (error: any) {
+      return {
+        totalEarnings: 0,
+        totalCommissionPaid: 0,
+        netPayout: 0,
+        completedBookingsCount: 0,
+      };
+    }
+  }
+
+  // ==========================================
+  // 6. Push Notifications & FCM Token
+  // ==========================================
+
+  public async updateFcmToken(fcmToken: string): Promise<void> {
+    const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
+    try {
+      await apiClient.post(API_ENDPOINTS.NOTIFICATIONS.UPDATE_FCM_TOKEN, {
+        fcmToken,
+        userId: activeUserId,
+      }, {
+        headers: { 'X-User-Id': activeUserId },
+      });
+    } catch (e) {
+      // Quietly ignore background push token sync notices
+    }
+  }
+
+  // ==========================================
+  // 7. Worker Schedules & Availability
+  // ==========================================
+
+  public async getWeeklyAvailability(): Promise<DaySchedule[]> {
+    try {
+      const response = await apiClient.get<any>(API_ENDPOINTS.WORKER.AVAILABILITY);
+      const data = (response.data as any)?.data ?? response.data;
+      return Array.isArray(data) ? data : [];
+    } catch (error: any) {
+      const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      return days.map((dayName, idx) => ({
+        dayOfWeek: idx + 1,
+        dayName,
+        isAvailable: idx < 6,
+        startTime: '08:00',
+        endTime: '20:00',
+        breakStartTime: '13:00',
+        breakEndTime: '14:00',
+        slotDurationMins: 60,
+      }));
+    }
+  }
+
+  public async saveWeeklyAvailability(schedule: DaySchedule[]): Promise<any> {
+    try {
+      const response = await apiClient.post(API_ENDPOINTS.WORKER.AVAILABILITY, { schedule });
+      return (response.data as any)?.data ?? response.data;
+    } catch (error: any) {
+      return { success: true };
+    }
+  }
+
+  public async getTimeOff(): Promise<TimeOffItem[]> {
+    try {
+      const response = await apiClient.get<any>(API_ENDPOINTS.WORKER.TIME_OFF);
+      const data = (response.data as any)?.data ?? response.data;
+      return Array.isArray(data) ? data : [];
+    } catch (error: any) {
+      return [];
+    }
+  }
+
+  public async addTimeOff(startDate: string, endDate: string, reason?: string): Promise<any> {
+    try {
+      const response = await apiClient.post(API_ENDPOINTS.WORKER.TIME_OFF, {
+        startDate,
+        endDate,
+        reason,
+      });
+      return (response.data as any)?.data ?? response.data;
+    } catch (error: any) {
+      return { success: true };
+    }
+  }
+
+  public async deleteTimeOff(id: string): Promise<any> {
+    try {
+      const response = await apiClient.delete(API_ENDPOINTS.WORKER.TIME_OFF_DETAIL(id));
+      return (response.data as any)?.data ?? response.data;
+    } catch (error: any) {
+      return { success: true };
+    }
+  }
+
+  public async getTodaySchedule(): Promise<WorkerTodaySchedule> {
+    try {
+      const response = await apiClient.get<any>(API_ENDPOINTS.WORKER.SCHEDULE_TODAY);
+      const data = (response.data as any)?.data ?? response.data;
+      return {
+        date: data?.date || new Date().toISOString().split('T')[0],
+        totalJobsToday: Number(data?.totalJobsToday ?? (data?.schedule?.length || 0)),
+        completedCount: Number(data?.completedCount ?? 0),
+        schedule: Array.isArray(data?.schedule) ? data.schedule : [],
+      };
+    } catch (error: any) {
+      return {
+        date: new Date().toISOString().split('T')[0],
+        totalJobsToday: 0,
+        completedCount: 0,
+        schedule: [],
+      };
+    }
+  }
+
+  public async getUpcomingSchedule(): Promise<WorkerScheduleSlot[]> {
+    try {
+      const response = await apiClient.get<any>(API_ENDPOINTS.WORKER.SCHEDULE_UPCOMING);
+      const data = (response.data as any)?.data ?? response.data;
+      return Array.isArray(data) ? data : [];
+    } catch (error: any) {
+      return [];
     }
   }
 }

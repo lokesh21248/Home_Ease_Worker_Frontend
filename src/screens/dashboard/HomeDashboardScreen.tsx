@@ -1,27 +1,32 @@
-import React from 'react';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   Image,
   TouchableOpacity,
   Switch,
-  StatusBar,
+  RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { borderRadius, shadows, spacing } from '../../theme/spacing';
-import { typography } from '../../theme/typography';
-import JobCard from '../../components/JobCard';
-import Button from '../../components/Button';
-import Badge from '../../components/Badge';
 import { useApp } from '../../state/AppContext';
 import { resolveBookingUuid } from '../../utils/uuid';
+import { PremiumCard } from '../../components/PremiumCard';
+import { StatCard } from '../../components/StatCard';
+import { SectionHeader } from '../../components/SectionHeader';
+import { BookingCard } from '../../components/BookingCard';
+import { PrimaryButton } from '../../components/PrimaryButton';
+import { SecondaryButton } from '../../components/SecondaryButton';
+import { EmptyState } from '../../components/EmptyState';
 
 export const HomeDashboardScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -30,23 +35,88 @@ export const HomeDashboardScreen: React.FC = () => {
     toggleOnlineStatus,
     jobRequests,
     activeJob,
-    earnings,
     unreadNotificationsCount,
     acceptJob,
     rejectJob,
     activeBannerAlert,
     dismissBannerAlert,
+    todaySchedule,
+    fetchSchedules,
+    fetchJobRequests,
+    locationData,
+    gpsStatus,
+    refreshLocation,
+    dashboardMetrics,
   } = useApp();
+
+  const [refreshing, setRefreshing] = useState(false);
+  const [isRefreshingLocation, setIsRefreshingLocation] = useState(false);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([
+      fetchJobRequests().catch(() => {}),
+      fetchSchedules().catch(() => {}),
+      refreshLocation().catch(() => {}),
+    ]);
+    setRefreshing(false);
+  };
+
+  const handleRefreshLocation = async () => {
+    if (isRefreshingLocation) return;
+    setIsRefreshingLocation(true);
+    try {
+      await refreshLocation();
+    } finally {
+      setIsRefreshingLocation(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSchedules().catch(() => {});
+    fetchJobRequests().catch(() => {});
+  }, []);
+
+  // Re-fetch requests whenever screen comes into focus (e.g., navigating back from another screen)
+  useFocusEffect(
+    useCallback(() => {
+      fetchJobRequests().catch(() => {});
+    }, [])
+  );
 
   const isOnline = worker.availability.isOnline;
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.surface} />
+  const getStatusDisplay = () => {
+    if (gpsStatus === 'unavailable') {
+      return {
+        dotColor: '#F59E0B',
+        label: 'GPS UNAVAILABLE',
+        desc: 'Turn on GPS to receive nearby jobs',
+      };
+    }
+    if (isOnline) {
+      return {
+        dotColor: '#10B981',
+        label: 'You are ONLINE',
+        desc: 'Ready & receiving customer orders in real-time',
+      };
+    }
+    return {
+      dotColor: '#718096',
+      label: 'You are OFFLINE',
+      desc: 'Turn switch ON to start receiving service requests',
+    };
+  };
 
-      {/* Top Professional Header */}
+  const statusDisplay = getStatusDisplay();
+
+  return (
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <StatusBar style="dark" />
+
+      {/* Top Profile & Header */}
       <View style={styles.topHeader}>
-        <View style={styles.workerProfileRow}>
+        <View style={styles.headerLeftCol}>
           <TouchableOpacity
             onPress={() => navigation.navigate('MainTabs', { screen: 'ProfileTab' })}
             activeOpacity={0.8}
@@ -56,49 +126,92 @@ export const HomeDashboardScreen: React.FC = () => {
             <View
               style={[
                 styles.avatarStatusBadge,
-                { backgroundColor: isOnline ? colors.onlineGreen : colors.offlineGray },
+                { backgroundColor: statusDisplay.dotColor },
               ]}
             />
           </TouchableOpacity>
 
           <View style={styles.workerMeta}>
             <View style={styles.nameRow}>
-              <Text style={styles.workerName}>{worker.name}</Text>
-              <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
+              <Text style={styles.workerName} numberOfLines={1}>
+                {worker.name || 'Service Partner'}
+              </Text>
+              <View style={styles.verifiedTag}>
+                <Ionicons name="checkmark-circle" size={13} color="#FFFFFF" />
+                <Text style={styles.verifiedText}>VERIFIED</Text>
+              </View>
             </View>
-            <View style={styles.ratingBadge}>
-              <Ionicons name="star" size={12} color={colors.starGold} />
-              <Text style={styles.ratingText}>{worker.rating} • Top Rated</Text>
+
+            <View style={styles.subMetaRow}>
+              <View style={styles.ratingBadge}>
+                <Ionicons name="star" size={11} color="#F59E0B" />
+                <Text style={styles.ratingText}>
+                  {dashboardMetrics.averageRating || '5.0'}
+                </Text>
+              </View>
+
+              <Text style={styles.dotSeparator}>•</Text>
+
+              {/* Location Pill with 1-Tap Refresh */}
+              <TouchableOpacity
+                onPress={handleRefreshLocation}
+                disabled={isRefreshingLocation}
+                style={styles.locationPill}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="location-outline" size={12} color={colors.primary} />
+                <Text style={styles.locationText} numberOfLines={1}>
+                  {locationData.locality || 'Madhapur'}
+                </Text>
+                {isRefreshingLocation ? (
+                  <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 2 }} />
+                ) : (
+                  <Ionicons name="refresh-outline" size={11} color={colors.primary} style={{ marginLeft: 2 }} />
+                )}
+              </TouchableOpacity>
             </View>
           </View>
         </View>
 
-        {/* Notifications & SOS */}
+        {/* Right Action Icons */}
         <View style={styles.headerRightIcons}>
           <TouchableOpacity
             onPress={() => navigation.navigate('Notifications')}
             style={styles.iconCircle}
             activeOpacity={0.7}
           >
-            <Ionicons name="notifications-outline" size={22} color={colors.textPrimary} />
+            <Ionicons name="notifications-outline" size={20} color={colors.textPrimary} />
             {unreadNotificationsCount > 0 && (
               <View style={styles.notificationDot}>
-                <Text style={styles.notifDotText}>{unreadNotificationsCount}</Text>
+                <Text style={styles.notifDotText}>
+                  {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
+                </Text>
               </View>
             )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Settings')}
+            style={styles.iconCircle}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="settings-outline" size={20} color={colors.textPrimary} />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Global In-app Toast Banner if triggered */}
+      {/* Global In-app Alert Banner */}
       {activeBannerAlert && (
         <View style={styles.toastBanner}>
-          <Ionicons name="notifications" size={18} color={colors.primary} />
+          <Ionicons name="flash" size={16} color={colors.primary} />
           <Text style={styles.toastText} numberOfLines={2}>
             {activeBannerAlert}
           </Text>
-          <TouchableOpacity onPress={dismissBannerAlert} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="close" size={18} color={colors.textSecondary} />
+          <TouchableOpacity
+            onPress={dismissBannerAlert}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="close" size={16} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
       )}
@@ -106,91 +219,77 @@ export const HomeDashboardScreen: React.FC = () => {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+          />
+        }
       >
-        {/* Online / Offline Floating Card */}
-        <View style={[styles.dutyStatusCard, isOnline ? styles.dutyOnline : styles.dutyOffline]}>
-          <View style={styles.dutyLeft}>
-            <View
-              style={[
-                styles.dutyIndicator,
-                { backgroundColor: isOnline ? colors.onlineGreen : colors.offlineGray },
-              ]}
-            />
-            <View>
-              <Text style={styles.dutyStatusText}>
-                {isOnline ? 'You are ONLINE' : 'You are OFFLINE'}
-              </Text>
-              <Text style={styles.dutySub}>
-                {isOnline
-                  ? 'Accepting incoming service calls'
-                  : 'Turn on to start receiving jobs'}
-              </Text>
+        {/* Availability Online / Offline Card */}
+        <PremiumCard
+          style={[
+            styles.dutyCard,
+            isOnline && styles.dutyCardOnline,
+          ]}
+        >
+          <View style={styles.dutyContentRow}>
+            <View style={styles.dutyLeft}>
+              <View style={[styles.dutyStatusDot, { backgroundColor: statusDisplay.dotColor }]} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.dutyStatusText}>{statusDisplay.label}</Text>
+                <Text style={styles.dutySub} numberOfLines={1}>
+                  {statusDisplay.desc}
+                </Text>
+              </View>
             </View>
-          </View>
 
-          <Switch
-            value={isOnline}
-            onValueChange={toggleOnlineStatus}
-            trackColor={{ false: colors.borderDark, true: colors.onlineGreen }}
-            thumbColor={colors.surface}
+            <Switch
+              value={isOnline}
+              onValueChange={toggleOnlineStatus}
+              trackColor={{ false: colors.borderDark, true: colors.primary }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+        </PremiumCard>
+
+        {/* 4 Statistics Cards Grid */}
+        <View style={styles.statsGrid}>
+          <StatCard
+            label="Today's Earnings"
+            value={`₹${(dashboardMetrics.todayEarnings || 0).toLocaleString('en-IN')}`}
+            icon={<Ionicons name="wallet-outline" size={18} color={colors.primary} />}
+            badge="LIVE"
+            badgePositive
+          />
+          <StatCard
+            label="Today's Bookings"
+            value={dashboardMetrics.todayJobs || 0}
+            icon={<Ionicons name="calendar-outline" size={18} color={colors.primary} />}
           />
         </View>
 
-        {/* 4 Dashboard Metric Cards */}
-        <View style={styles.metricsGrid}>
-          {/* Card 1: Today's Jobs */}
-          <View style={styles.metricCard}>
-            <View style={[styles.metricIconWrap, { backgroundColor: colors.primaryLighter }]}>
-              <Ionicons name="briefcase" size={20} color={colors.primary} />
-            </View>
-            <Text style={styles.metricValue}>{earnings.daily.completedJobs || 5}</Text>
-            <Text style={styles.metricLabel}>Today&apos;s Jobs</Text>
-          </View>
-
-          {/* Card 2: Today's Earnings */}
-          <TouchableOpacity
-            style={styles.metricCard}
-            activeOpacity={0.8}
-            onPress={() => navigation.navigate('MainTabs', { screen: 'EarningsTab' })}
-          >
-            <View style={[styles.metricIconWrap, { backgroundColor: colors.successLight }]}>
-              <Ionicons name="wallet" size={20} color={colors.success} />
-            </View>
-            <Text style={[styles.metricValue, { color: colors.success }]}>
-              ₹{earnings.daily.netPayout.toLocaleString()}
-            </Text>
-            <Text style={styles.metricLabel}>Today&apos;s Earnings</Text>
-          </TouchableOpacity>
-
-          {/* Card 3: Completed Jobs */}
-          <View style={styles.metricCard}>
-            <View style={[styles.metricIconWrap, { backgroundColor: colors.infoLight }]}>
-              <Ionicons name="checkmark-done-circle" size={20} color={colors.info} />
-            </View>
-            <Text style={styles.metricValue}>{worker.completedJobsCount}</Text>
-            <Text style={styles.metricLabel}>Completed</Text>
-          </View>
-
-          {/* Card 4: Rating */}
-          <TouchableOpacity
-            style={styles.metricCard}
-            activeOpacity={0.8}
-            onPress={() => navigation.navigate('ReviewsRatings')}
-          >
-            <View style={[styles.metricIconWrap, { backgroundColor: colors.warningLight }]}>
-              <Ionicons name="star" size={20} color={colors.accent} />
-            </View>
-            <Text style={[styles.metricValue, { color: colors.accent }]}>
-              {worker.rating} ★
-            </Text>
-            <Text style={styles.metricLabel}>Rating</Text>
-          </TouchableOpacity>
+        <View style={[styles.statsGrid, { marginTop: spacing.sm }]}>
+          <StatCard
+            label="Jobs Completed"
+            value={dashboardMetrics.completedJobs || 0}
+            icon={<Ionicons name="checkmark-done-circle-outline" size={18} color={colors.primary} />}
+          />
+          <StatCard
+            label="Customer Rating"
+            value={`${dashboardMetrics.averageRating || '5.0'} ★`}
+            icon={<Ionicons name="star-outline" size={18} color={colors.primary} />}
+            badge="TOP 5%"
+            badgePositive
+          />
         </View>
 
-        {/* ACTIVE JOB BANNER (If worker has ongoing order) */}
+        {/* Active Job in Progress Banner */}
         {activeJob && (
-          <View style={styles.activeJobBanner}>
-            <View style={styles.activeJobHeader}>
+          <PremiumCard style={styles.activeJobCard}>
+            <View style={styles.activeJobHeaderRow}>
               <View style={styles.pulsingBadge}>
                 <View style={styles.pulsingDot} />
                 <Text style={styles.activeJobBadgeText}>JOB IN PROGRESS</Text>
@@ -198,131 +297,128 @@ export const HomeDashboardScreen: React.FC = () => {
               <Text style={styles.activeJobTime}>{activeJob.scheduledTime}</Text>
             </View>
 
-            <View style={styles.activeJobDetailsRow}>
-              <Image source={{ uri: activeJob.customer.avatar }} style={styles.customerThumb} />
-              <View style={styles.activeJobCol}>
-                <Text style={styles.activeCustomerName}>{activeJob.customer.name}</Text>
+            <View style={styles.activeJobBody}>
+              <View style={styles.activeJobLeft}>
                 <Text style={styles.activeServiceName}>{activeJob.serviceName}</Text>
-                <Text style={styles.activeLocationText} numberOfLines={1}>
+                <Text style={styles.activeCustomerName}>
+                  {activeJob.customer.name} • #{activeJob.jobId}
+                </Text>
+                <Text style={styles.activeAddress} numberOfLines={1}>
                   {activeJob.location.address}
                 </Text>
               </View>
-              <View style={styles.activePayoutWrap}>
-                <Text style={styles.activePayoutVal}>₹{activeJob.netPayout}</Text>
-                <Text style={styles.activePayoutTag}>{activeJob.status}</Text>
+              <View style={styles.activePayoutBox}>
+                <Text style={styles.activePayoutLabel}>Net Payout</Text>
+                <Text style={styles.activePayoutValue}>₹{activeJob.netPayout}</Text>
               </View>
             </View>
 
-            <View style={styles.activeJobActions}>
-              <Button
-                title="Open Live Tracking & Status"
-                variant="secondary"
-                size="md"
-                fullWidth
-                onPress={() => {
-                  const bookingId = resolveBookingUuid(activeJob.bookingId, activeJob.id);
-                  navigation.navigate('ActiveJob', { job: { ...activeJob, bookingId }, bookingId });
-                }}
-                icon={<Ionicons name="navigate" size={18} color={colors.textInverse} />}
-              />
-            </View>
-          </View>
+            <PrimaryButton
+              title="Open Live Execution & GPS"
+              size="md"
+              icon={<Ionicons name="navigate-outline" size={16} color="#FFFFFF" />}
+              onPress={() => {
+                const bookingId = resolveBookingUuid(activeJob.bookingId, activeJob.id);
+                navigation.navigate('ActiveJob', { job: { ...activeJob, bookingId }, bookingId });
+              }}
+              style={{ marginTop: spacing.md }}
+            />
+          </PremiumCard>
         )}
 
-        {/* New Job Requests Section */}
-        <View style={styles.sectionHeaderRow}>
-          <View>
-            <Text style={styles.sectionTitle}>New Job Requests</Text>
-            <Text style={styles.sectionSubtitle}>
-              {jobRequests.length > 0
-                ? `${jobRequests.length} nearby requests waiting for your acceptance`
-                : 'No pending requests at the moment'}
-            </Text>
-          </View>
-
-          {jobRequests.length > 0 && (
-            <TouchableOpacity
-              onPress={() => navigation.navigate('JobRequests')}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.viewAllText}>View All ({jobRequests.length})</Text>
-            </TouchableOpacity>
-          )}
+        {/* Incoming Job Requests Section */}
+        <View style={styles.sectionHeaderWrap}>
+          <SectionHeader
+            title="Incoming Requests"
+            subtitle={
+              jobRequests.length > 0
+                ? `${jobRequests.length} nearby requests waiting for acceptance`
+                : 'Stay online to receive instant dispatches'
+            }
+            badge={jobRequests.length > 0 ? jobRequests.length : undefined}
+            actionText={jobRequests.length > 3 ? 'View All' : undefined}
+            onAction={() => navigation.navigate('JobRequests')}
+          />
         </View>
 
         {jobRequests.length > 0 ? (
-          jobRequests.slice(0, 2).map((job) => (
-            <JobCard
-              key={job.id}
+          jobRequests.slice(0, 3).map((job) => (
+            <BookingCard
+              key={job.bookingId || job.id}
               job={job}
               onPress={() => navigation.navigate('JobDetails', { job })}
               onAccept={() => {
                 const bookingId = resolveBookingUuid(job.bookingId, job.id);
                 acceptJob(bookingId);
-                navigation.navigate('ActiveJob', { job: { ...job, id: bookingId, bookingId, status: 'accepted' }, bookingId });
+                navigation.navigate('ActiveJob', {
+                  job: { ...job, id: bookingId, bookingId, status: 'accepted' },
+                  bookingId,
+                });
               }}
-              onReject={() => rejectJob(job.id)}
+              onReject={() => rejectJob(job.id, 'Partner unavailable')}
             />
           ))
         ) : (
-          <View style={styles.emptyRequestsBox}>
-            <Ionicons name="radio-outline" size={36} color={colors.primary} />
-            <Text style={styles.emptyRequestsTitle}>Looking for nearby bookings...</Text>
-            <Text style={styles.emptyRequestsSub}>
-              Stay online and within your coverage zone to receive priority requests.
-            </Text>
-          </View>
+          <PremiumCard style={styles.emptyRequestsWrap}>
+            <EmptyState
+              iconName="radio-outline"
+              title="No Incoming Requests"
+              description="You are connected to live dispatch. When a customer in your area requests service, it will alert here."
+            />
+          </PremiumCard>
         )}
 
-        {/* Quick Action Shortcuts */}
-        <View style={styles.quickShortcuts}>
-          <Text style={styles.quickShortcutsTitle}>Quick Actions</Text>
-          <View style={styles.shortcutsRow}>
-            <TouchableOpacity
-              style={styles.shortcutItem}
-              activeOpacity={0.7}
-              onPress={() => navigation.navigate('JobRequests')}
-            >
-              <View style={[styles.shortcutIcon, { backgroundColor: colors.primaryLighter }]}>
-                <Ionicons name="flash" size={20} color={colors.primary} />
-              </View>
-              <Text style={styles.shortcutText}>Requests</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.shortcutItem}
-              activeOpacity={0.7}
-              onPress={() => navigation.navigate('Wallet')}
-            >
-              <View style={[styles.shortcutIcon, { backgroundColor: colors.successLight }]}>
-                <Ionicons name="card" size={20} color={colors.success} />
-              </View>
-              <Text style={styles.shortcutText}>Wallet</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.shortcutItem}
-              activeOpacity={0.7}
-              onPress={() => navigation.navigate('BankDetails')}
-            >
-              <View style={[styles.shortcutIcon, { backgroundColor: colors.infoLight }]}>
-                <Ionicons name="business" size={20} color={colors.info} />
-              </View>
-              <Text style={styles.shortcutText}>Bank Acc</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.shortcutItem}
-              activeOpacity={0.7}
-              onPress={() => navigation.navigate('Support')}
-            >
-              <View style={[styles.shortcutIcon, { backgroundColor: colors.warningLight }]}>
-                <Ionicons name="headset" size={20} color={colors.accent} />
-              </View>
-              <Text style={styles.shortcutText}>Support</Text>
-            </TouchableOpacity>
-          </View>
+        {/* Today's Schedule Preview */}
+        <View style={styles.sectionHeaderWrap}>
+          <SectionHeader
+            title="Today's Schedule & Slots"
+            subtitle="Preview of confirmed and open booking windows"
+            actionText="Manage Slots"
+            onAction={() => navigation.navigate('MainTabs', { screen: 'SlotsTab' })}
+          />
         </View>
+
+        {todaySchedule && todaySchedule.schedule.length > 0 ? (
+          todaySchedule.schedule.slice(0, 3).map((slot, idx) => (
+            <PremiumCard key={slot.bookingId || `today-slot-${idx}`} style={styles.scheduleItemCard}>
+              <View style={styles.scheduleRow}>
+                <View style={styles.scheduleTimeBox}>
+                  <Text style={styles.scheduleTimeText}>
+                    {slot.timeWindow || slot.scheduledAt || '09:00 AM'}
+                  </Text>
+                  <Text style={styles.scheduleTypeTag}>{slot.bookingType || 'SCHEDULED'}</Text>
+                </View>
+                <View style={styles.scheduleDivider} />
+                <View style={styles.scheduleMetaCol}>
+                  <Text style={styles.scheduleServiceName} numberOfLines={1}>
+                    {slot.serviceName || 'Home Service'}
+                  </Text>
+                  <Text style={styles.scheduleCustomerName} numberOfLines={1}>
+                    {slot.customerName || 'Customer Booking'}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+              </View>
+            </PremiumCard>
+          ))
+        ) : (
+          <PremiumCard style={styles.scheduleEmptyCard}>
+            <View style={styles.scheduleEmptyContent}>
+              <Ionicons name="calendar-outline" size={24} color={colors.primary} />
+              <View style={{ flex: 1, marginLeft: spacing.md }}>
+                <Text style={styles.scheduleEmptyTitle}>No Bookings Assigned Yet Today</Text>
+                <Text style={styles.scheduleEmptySub}>
+                  Slots are open. Manage your working hours in the Slots tab.
+                </Text>
+              </View>
+              <SecondaryButton
+                title="View Slots"
+                size="sm"
+                onPress={() => navigation.navigate('MainTabs', { screen: 'SlotsTab' })}
+              />
+            </View>
+          </PremiumCard>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -334,71 +430,116 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   topHeader: {
+    backgroundColor: '#FFFFFF',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
+    borderBottomColor: colors.border,
   },
-  workerProfileRow: {
+  headerLeftCol: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   avatarWrapper: {
     position: 'relative',
+    marginRight: spacing.md,
   },
   avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: colors.surfaceAlt,
     borderWidth: 2,
-    borderColor: colors.border,
+    borderColor: colors.primary,
   },
   avatarStatusBadge: {
-    position: 'absolute',
-    bottom: -1,
-    right: -1,
     width: 12,
     height: 12,
     borderRadius: 6,
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
     borderWidth: 2,
-    borderColor: colors.surface,
+    borderColor: '#FFFFFF',
   },
   workerMeta: {
-    marginLeft: spacing.md,
+    flex: 1,
   },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
   workerName: {
-    ...typography.subtitle1,
+    fontSize: 16,
+    fontWeight: '700',
     color: colors.textPrimary,
+    letterSpacing: -0.3,
+  },
+  verifiedTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: borderRadius.xs,
+    gap: 2,
+  },
+  verifiedText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  subMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 3,
   },
   ratingBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 2,
+    gap: 2,
   },
   ratingText: {
-    ...typography.caption,
-    color: colors.textSecondary,
+    fontSize: 12,
     fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  dotSeparator: {
+    marginHorizontal: 6,
+    color: colors.textMuted,
+    fontSize: 12,
+  },
+  locationPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primarySoft,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+    maxWidth: 130,
+  },
+  locationText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.primary,
     marginLeft: 3,
   },
   headerRightIcons: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+    marginLeft: spacing.sm,
   },
   iconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: borderRadius.md,
     backgroundColor: colors.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
@@ -409,272 +550,216 @@ const styles = StyleSheet.create({
     top: 6,
     right: 6,
     backgroundColor: colors.danger,
-    borderRadius: 8,
-    minWidth: 16,
-    height: 16,
+    borderRadius: borderRadius.full,
+    minWidth: 14,
+    height: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 3,
+    paddingHorizontal: 2,
   },
   notifDotText: {
-    color: colors.textInverse,
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: '800',
+    color: '#FFFFFF',
   },
   toastBanner: {
+    backgroundColor: '#EFF6FF',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.primaryLighter,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: colors.primarySoft,
+    borderBottomColor: colors.border,
+    gap: spacing.sm,
   },
   toastText: {
-    ...typography.caption,
-    color: colors.primary,
-    fontWeight: '700',
     flex: 1,
-    marginHorizontal: spacing.sm,
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.primary,
   },
   scrollContent: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xxl,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.huge,
   },
-  dutyStatusCard: {
+  dutyCard: {
+    marginBottom: spacing.md,
+    padding: spacing.md,
+    backgroundColor: '#FFFFFF',
+  },
+  dutyCardOnline: {
+    borderColor: '#C7D7F9',
+  },
+  dutyContentRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: spacing.md + 2,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1.5,
-    marginBottom: spacing.lg,
-    ...shadows.sm,
-  },
-  dutyOnline: {
-    backgroundColor: colors.surface,
-    borderColor: colors.onlineGreen,
-  },
-  dutyOffline: {
-    backgroundColor: colors.surfaceAlt,
-    borderColor: colors.borderDark,
   },
   dutyLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    marginRight: spacing.md,
   },
-  dutyIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+  dutyStatusDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     marginRight: spacing.md,
   },
   dutyStatusText: {
-    ...typography.subtitle2,
+    fontSize: 14,
+    fontWeight: '700',
     color: colors.textPrimary,
-    fontWeight: '800',
   },
   dutySub: {
-    ...typography.caption,
+    fontSize: 12,
     color: colors.textSecondary,
-    marginTop: 1,
-  },
-  metricsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-    marginBottom: spacing.xl,
-  },
-  metricCard: {
-    width: '48%',
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md + 2,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    ...shadows.sm,
-  },
-  metricIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.sm,
-  },
-  metricValue: {
-    ...typography.h2,
-    color: colors.textPrimary,
-    fontWeight: '800',
-  },
-  metricLabel: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    fontWeight: '600',
     marginTop: 2,
   },
-  activeJobBanner: {
-    backgroundColor: '#0F172A',
-    borderRadius: borderRadius.xl,
-    padding: spacing.lg,
-    marginBottom: spacing.xl,
-    ...shadows.md,
-  },
-  activeJobHeader: {
+  statsGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
+    gap: spacing.md,
+  },
+  activeJobCard: {
+    marginTop: spacing.md,
+    padding: spacing.lg,
+    borderColor: colors.primary,
+    borderWidth: 1.5,
+  },
+  activeJobHeaderRow: {
+    flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: spacing.md,
+    alignItems: 'center',
+    marginBottom: spacing.sm,
   },
   pulsingBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1E293B',
-    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.primarySoft,
+    paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: borderRadius.full,
+    gap: 6,
   },
   pulsingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.onlineGreen,
-    marginRight: 6,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.primary,
   },
   activeJobBadgeText: {
-    ...typography.caption,
-    color: colors.onlineGreen,
-    fontWeight: '800',
     fontSize: 10,
+    fontWeight: '800',
+    color: colors.primary,
     letterSpacing: 0.5,
   },
   activeJobTime: {
-    ...typography.caption,
-    color: '#94A3B8',
+    fontSize: 12,
     fontWeight: '600',
+    color: colors.textSecondary,
   },
-  activeJobDetailsRow: {
+  activeJobBody: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    justifyContent: 'space-between',
   },
-  customerThumb: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1.5,
-    borderColor: '#334155',
-  },
-  activeJobCol: {
+  activeJobLeft: {
     flex: 1,
-    marginLeft: spacing.md,
-  },
-  activeCustomerName: {
-    ...typography.subtitle1,
-    color: '#F8FAFC',
-    fontWeight: '700',
+    marginRight: spacing.md,
   },
   activeServiceName: {
-    ...typography.caption,
-    color: '#38BDF8',
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textPrimary,
   },
-  activeLocationText: {
-    ...typography.caption,
-    color: '#94A3B8',
-    fontSize: 11,
+  activeCustomerName: {
+    fontSize: 13,
+    color: colors.textSecondary,
     marginTop: 2,
   },
-  activePayoutWrap: {
+  activeAddress: {
+    fontSize: 12,
+    color: colors.textMuted,
+    marginTop: 2,
+  },
+  activePayoutBox: {
     alignItems: 'flex-end',
   },
-  activePayoutVal: {
-    ...typography.h3,
-    color: '#4ADE80',
+  activePayoutLabel: {
+    fontSize: 11,
+    color: colors.textSecondary,
+  },
+  activePayoutValue: {
+    fontSize: 18,
     fontWeight: '800',
+    color: colors.primary,
   },
-  activePayoutTag: {
-    ...typography.caption,
-    color: '#94A3B8',
-    fontSize: 10,
-    textTransform: 'uppercase',
+  sectionHeaderWrap: {
+    marginTop: spacing.xl,
   },
-  activeJobActions: {
-    marginTop: spacing.xs,
+  emptyRequestsWrap: {
+    padding: spacing.lg,
+    alignItems: 'center',
   },
-  sectionHeaderRow: {
+  scheduleItemCard: {
+    marginBottom: spacing.sm,
+    padding: spacing.md,
+  },
+  scheduleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.md,
   },
-  sectionTitle: {
-    ...typography.h3,
+  scheduleTimeBox: {
+    width: 80,
+  },
+  scheduleTimeText: {
+    fontSize: 12,
+    fontWeight: '700',
     color: colors.textPrimary,
   },
-  sectionSubtitle: {
-    ...typography.caption,
+  scheduleTypeTag: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  scheduleDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: colors.borderLight,
+    marginHorizontal: spacing.md,
+  },
+  scheduleMetaCol: {
+    flex: 1,
+  },
+  scheduleServiceName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  scheduleCustomerName: {
+    fontSize: 12,
     color: colors.textSecondary,
     marginTop: 2,
   },
-  viewAllText: {
-    ...typography.subtitle2,
-    color: colors.primary,
-    fontWeight: '700',
+  scheduleEmptyCard: {
+    padding: spacing.md,
   },
-  emptyRequestsBox: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.xl,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    marginBottom: spacing.xl,
-  },
-  emptyRequestsTitle: {
-    ...typography.subtitle1,
-    color: colors.textPrimary,
-    marginTop: spacing.sm,
-  },
-  emptyRequestsSub: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginTop: 4,
-    maxWidth: 260,
-  },
-  quickShortcuts: {
-    marginTop: spacing.sm,
-  },
-  quickShortcutsTitle: {
-    ...typography.subtitle1,
-    color: colors.textPrimary,
-    fontWeight: '700',
-    marginBottom: spacing.md,
-  },
-  shortcutsRow: {
+  scheduleEmptyContent: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  shortcutItem: {
     alignItems: 'center',
-    width: '23%',
   },
-  shortcutIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.xs,
-  },
-  shortcutText: {
-    ...typography.caption,
+  scheduleEmptyTitle: {
+    fontSize: 13,
+    fontWeight: '700',
     color: colors.textPrimary,
-    fontWeight: '600',
-    textAlign: 'center',
+  },
+  scheduleEmptySub: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
 });
 

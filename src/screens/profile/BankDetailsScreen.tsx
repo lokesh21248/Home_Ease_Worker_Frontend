@@ -3,20 +3,20 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  TextInput,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme/colors';
 import { borderRadius, shadows, spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-import Header from '../../components/Header';
-import Button from '../../components/Button';
-import Input from '../../components/Input';
-import Badge from '../../components/Badge';
+import { CustomHeader } from '../../components/CustomHeader';
+import { PremiumCard } from '../../components/PremiumCard';
+import { PrimaryButton } from '../../components/PrimaryButton';
 import { useApp } from '../../state/AppContext';
 
 export const BankDetailsScreen: React.FC = () => {
@@ -85,8 +85,8 @@ export const BankDetailsScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <CustomHeader
         title="Bank Account Details"
         subtitle="Direct IMPS Payout Configuration"
         showBack
@@ -96,15 +96,18 @@ export const BankDetailsScreen: React.FC = () => {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {/* Active Verified Bank Card Preview */}
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Card Preview Visual */}
           <View style={styles.creditCardVisual}>
             <View style={styles.cardTopRow}>
               <View>
                 <Text style={styles.cardTypeLabel}>PARTNER PAYOUT ACCOUNT</Text>
                 <Text style={styles.cardBankTitle}>{bankName || 'BANK NAME'}</Text>
               </View>
-              <Ionicons name="card" size={32} color="#FFFFFF" />
+              <Ionicons name="card-outline" size={28} color="#FFFFFF" />
             </View>
 
             <Text style={styles.maskedNumber}>
@@ -115,7 +118,7 @@ export const BankDetailsScreen: React.FC = () => {
               <View>
                 <Text style={styles.cardSmallLabel}>HOLDER NAME</Text>
                 <Text style={styles.cardHolderText}>
-                  {accountHolder ? accountHolder.toUpperCase() : 'YOUR NAME'}
+                  {accountHolder ? accountHolder.toUpperCase() : 'PARTNER NAME'}
                 </Text>
               </View>
 
@@ -127,97 +130,141 @@ export const BankDetailsScreen: React.FC = () => {
           </View>
 
           {/* Form Card */}
-          <View style={styles.formCard}>
+          <PremiumCard style={styles.formCard}>
             <View style={styles.securityNotice}>
-              <Ionicons name="shield-checkmark" size={18} color={colors.primary} />
+              <Ionicons name="shield-checkmark-outline" size={18} color={colors.primary} />
               <Text style={styles.securityText}>
                 Bank details are encrypted using 256-bit bank grade security. Payouts are credited
-                directly without intermediary hold.
+                directly without intermediary holds.
               </Text>
             </View>
 
-            <Input
-              label="Account Holder Name"
-              required
-              placeholder="As printed on bank passbook"
-              value={accountHolder}
-              onChangeText={(text) => {
-                setAccountHolder(text);
-                if (errors.accountHolder) setErrors({ ...errors, accountHolder: '' });
-              }}
-              leftIcon={<Ionicons name="person-outline" size={20} color={colors.primary} />}
-              error={errors.accountHolder}
-            />
+            {/* Input fields */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Account Holder Name *</Text>
+              <View style={[styles.inputBox, Boolean(errors.accountHolder) && styles.inputBoxError]}>
+                <Ionicons name="person-outline" size={18} color={colors.primary} />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="As printed on bank passbook"
+                  placeholderTextColor={colors.textSecondary}
+                  value={accountHolder}
+                  onChangeText={(text) => {
+                    setAccountHolder(text);
+                    if (errors.accountHolder) setErrors({ ...errors, accountHolder: '' });
+                  }}
+                />
+              </View>
+              {errors.accountHolder ? (
+                <Text style={styles.errorText}>{errors.accountHolder}</Text>
+              ) : null}
+            </View>
 
-            <Input
-              label="Bank Name"
-              required
-              placeholder="e.g. HDFC Bank, SBI, ICICI"
-              value={bankName}
-              onChangeText={(text) => {
-                setBankName(text);
-                if (errors.bankName) setErrors({ ...errors, bankName: '' });
-              }}
-              leftIcon={<Ionicons name="business-outline" size={20} color={colors.primary} />}
-              error={errors.bankName}
-            />
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Bank Name *</Text>
+              <View style={[styles.inputBox, Boolean(errors.bankName) && styles.inputBoxError]}>
+                <Ionicons name="business-outline" size={18} color={colors.primary} />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="e.g. HDFC Bank, SBI, ICICI"
+                  placeholderTextColor={colors.textSecondary}
+                  value={bankName}
+                  onChangeText={(text) => {
+                    setBankName(text);
+                    if (errors.bankName) setErrors({ ...errors, bankName: '' });
+                  }}
+                />
+              </View>
+              {errors.bankName ? (
+                <Text style={styles.errorText}>{errors.bankName}</Text>
+              ) : null}
+            </View>
 
-            <Input
-              label="Account Number"
-              required
-              placeholder="Enter account number"
-              value={accountNumber}
-              onChangeText={(text) => {
-                setAccountNumber(text);
-                if (errors.accountNumber) setErrors({ ...errors, accountNumber: '' });
-              }}
-              keyboardType="number-pad"
-              leftIcon={<Ionicons name="keypad-outline" size={20} color={colors.primary} />}
-              error={errors.accountNumber}
-            />
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Account Number *</Text>
+              <View style={[styles.inputBox, Boolean(errors.accountNumber) && styles.inputBoxError]}>
+                <Ionicons name="keypad-outline" size={18} color={colors.primary} />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Enter account number"
+                  placeholderTextColor={colors.textSecondary}
+                  value={accountNumber}
+                  onChangeText={(text) => {
+                    setAccountNumber(text);
+                    if (errors.accountNumber) setErrors({ ...errors, accountNumber: '' });
+                  }}
+                  keyboardType="number-pad"
+                />
+              </View>
+              {errors.accountNumber ? (
+                <Text style={styles.errorText}>{errors.accountNumber}</Text>
+              ) : null}
+            </View>
 
-            <Input
-              label="Confirm Account Number"
-              required
-              placeholder="Re-enter account number"
-              value={confirmAccountNumber}
-              onChangeText={(text) => {
-                setConfirmAccountNumber(text);
-                if (errors.confirmAccountNumber) setErrors({ ...errors, confirmAccountNumber: '' });
-              }}
-              keyboardType="number-pad"
-              leftIcon={<Ionicons name="checkmark-circle-outline" size={20} color={colors.primary} />}
-              error={errors.confirmAccountNumber}
-            />
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Confirm Account Number *</Text>
+              <View
+                style={[
+                  styles.inputBox,
+                  Boolean(errors.confirmAccountNumber) && styles.inputBoxError,
+                ]}
+              >
+                <Ionicons name="checkmark-circle-outline" size={18} color={colors.primary} />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Re-enter account number"
+                  placeholderTextColor={colors.textSecondary}
+                  value={confirmAccountNumber}
+                  onChangeText={(text) => {
+                    setConfirmAccountNumber(text);
+                    if (errors.confirmAccountNumber)
+                      setErrors({ ...errors, confirmAccountNumber: '' });
+                  }}
+                  keyboardType="number-pad"
+                />
+              </View>
+              {errors.confirmAccountNumber ? (
+                <Text style={styles.errorText}>{errors.confirmAccountNumber}</Text>
+              ) : null}
+            </View>
 
-            <Input
-              label="IFSC Code"
-              required
-              placeholder="e.g. HDFC0001245"
-              value={ifscCode}
-              onChangeText={(text) => {
-                setIfscCode(text);
-                if (errors.ifscCode) setErrors({ ...errors, ifscCode: '' });
-              }}
-              autoCapitalize="characters"
-              maxLength={11}
-              leftIcon={<Ionicons name="barcode-outline" size={20} color={colors.primary} />}
-              error={errors.ifscCode}
-              helperText="11 characters code found on your cheque or passbook"
-            />
-          </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>IFSC Code *</Text>
+              <View style={[styles.inputBox, Boolean(errors.ifscCode) && styles.inputBoxError]}>
+                <Ionicons name="barcode-outline" size={18} color={colors.primary} />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="e.g. HDFC0001245"
+                  placeholderTextColor={colors.textSecondary}
+                  value={ifscCode}
+                  onChangeText={(text) => {
+                    setIfscCode(text);
+                    if (errors.ifscCode) setErrors({ ...errors, ifscCode: '' });
+                  }}
+                  autoCapitalize="characters"
+                  maxLength={11}
+                />
+              </View>
+              {errors.ifscCode ? (
+                <Text style={styles.errorText}>{errors.ifscCode}</Text>
+              ) : (
+                <Text style={styles.helperText}>
+                  11 character code found on your cheque or passbook
+                </Text>
+              )}
+            </View>
+          </PremiumCard>
         </ScrollView>
       </KeyboardAvoidingView>
 
       <View style={styles.footer}>
-        <Button
+        <PrimaryButton
           title="Save & Verify Bank Account"
-          variant="primary"
           size="lg"
           fullWidth
           loading={isSaving}
           onPress={handleSave}
-          icon={<Ionicons name="checkmark-done-circle" size={18} color={colors.textInverse} />}
+          icon={<Ionicons name="checkmark-done-circle-outline" size={20} color="#FFFFFF" />}
         />
       </View>
     </SafeAreaView>
@@ -230,15 +277,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   scrollContent: {
-    padding: spacing.lg,
+    padding: spacing.md,
     paddingBottom: spacing.xxl,
   },
   creditCardVisual: {
-    backgroundColor: colors.primaryDark,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
-    marginBottom: spacing.lg,
-    ...shadows.md,
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+    ...shadows.sm,
   },
   cardTopRow: {
     flexDirection: 'row',
@@ -246,14 +293,14 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   cardTypeLabel: {
-    ...typography.caption,
-    color: '#93C5FD',
     fontSize: 10,
+    color: 'rgba(255, 255, 255, 0.8)',
     fontWeight: '800',
     letterSpacing: 0.8,
   },
   cardBankTitle: {
-    ...typography.h3,
+    fontSize: 18,
+    fontWeight: '800',
     color: '#FFFFFF',
     marginTop: 2,
   },
@@ -270,51 +317,84 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   cardSmallLabel: {
-    ...typography.caption,
-    color: '#94A3B8',
     fontSize: 9,
+    color: 'rgba(255, 255, 255, 0.7)',
     fontWeight: '700',
   },
   cardHolderText: {
-    ...typography.subtitle2,
-    color: '#F8FAFC',
+    fontSize: 13,
     fontWeight: '700',
+    color: '#FFFFFF',
     marginTop: 2,
   },
   cardIfscText: {
-    ...typography.subtitle2,
-    color: '#F8FAFC',
+    fontSize: 13,
     fontWeight: '700',
+    color: '#FFFFFF',
     marginTop: 2,
   },
   formCard: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    ...shadows.sm,
+    marginBottom: spacing.md,
   },
   securityNotice: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.primaryLighter,
+    backgroundColor: colors.primaryLight,
     padding: spacing.md,
     borderRadius: borderRadius.md,
-    marginBottom: spacing.lg,
     gap: spacing.sm,
+    marginBottom: spacing.md,
   },
   securityText: {
-    ...typography.caption,
-    color: colors.primary,
     flex: 1,
+    fontSize: 12,
+    color: colors.primary,
     lineHeight: 16,
   },
+  inputGroup: {
+    marginBottom: spacing.md,
+  },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: 6,
+  },
+  inputBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+    height: 48,
+    gap: spacing.sm,
+  },
+  inputBoxError: {
+    borderColor: colors.danger,
+  },
+  textInput: {
+    flex: 1,
+    height: '100%',
+    fontSize: 14,
+    color: colors.textPrimary,
+  },
+  errorText: {
+    fontSize: 11,
+    color: colors.danger,
+    marginTop: 4,
+  },
+  helperText: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginTop: 4,
+  },
   footer: {
-    padding: spacing.lg,
-    backgroundColor: colors.surface,
+    padding: spacing.md,
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
+    borderTopColor: colors.border,
   },
 });
 

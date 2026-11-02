@@ -3,28 +3,29 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   TouchableOpacity,
+  TextInput,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { borderRadius, shadows, spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-import Button from '../../components/Button';
-import Input from '../../components/Input';
+import { PremiumCard } from '../../components/PremiumCard';
+import { PrimaryButton } from '../../components/PrimaryButton';
 import { firebaseAuthService } from '../../services/firebaseAuthService';
 import { workerApiService } from '../../api/workerApiService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
 export const LoginScreen: React.FC<Props> = ({ navigation }) => {
-  const [countryCode, setCountryCode] = useState('+91');
-  const [phoneNumber, setPhoneNumber] = useState('9876543210');
+  const [countryCode] = useState('+91');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -46,12 +47,10 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
       setIsLoading(true);
       const fullNumber = `${countryCode}${cleanNumber}`;
 
-      // End-to-end Backend Send OTP: POST /auth/otp/send
       try {
         await workerApiService.sendOtp(fullNumber);
       } catch (backendErr: any) {
         console.warn('[LoginScreen] Live backend notice:', backendErr?.message);
-        // Fallback local auth simulation if remote backend is unreachable
         await firebaseAuthService.signInWithPhoneNumber(cleanNumber, countryCode);
       }
 
@@ -68,7 +67,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
@@ -77,79 +76,70 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Header */}
+          {/* Brand Header */}
           <View style={styles.header}>
             <View style={styles.iconCircle}>
-              <Ionicons name="phone-portrait-outline" size={28} color={colors.primary} />
+              <Ionicons name="construct-outline" size={32} color={colors.primary} />
             </View>
-            <Text style={styles.title}>Partner Login</Text>
+            <Text style={styles.brandTitle}>HomeEase Partner</Text>
             <Text style={styles.subtitle}>
-              Enter your mobile number to sign in or register as a HomeEase professional.
+              Sign in with your verified mobile number to receive instant bookings
             </Text>
           </View>
 
           {/* Form Card */}
-          <View style={styles.card}>
-            <View style={styles.phoneInputRow}>
+          <PremiumCard style={styles.card}>
+            <Text style={styles.inputLabel}>Mobile Phone Number</Text>
+            <View style={[styles.phoneInputRow, Boolean(error) && styles.inputRowError]}>
               {/* Country Code Pill */}
               <View style={styles.countryCodeBox}>
-                <Text style={styles.flag}>🇮🇳</Text>
                 <Text style={styles.countryCodeText}>{countryCode}</Text>
               </View>
 
               {/* Mobile Number Input */}
-              <View style={styles.numberInputContainer}>
-                <Input
-                  placeholder="98765 43210"
-                  value={phoneNumber}
-                  onChangeText={(text) => {
-                    setPhoneNumber(text);
-                    if (error) setError('');
-                  }}
-                  keyboardType="phone-pad"
-                  maxLength={10}
-                  error={error}
-                  containerStyle={styles.inputWrapper}
-                />
-              </View>
+              <TextInput
+                placeholder="98765 43210"
+                placeholderTextColor={colors.textSecondary}
+                value={phoneNumber}
+                onChangeText={(text) => {
+                  setPhoneNumber(text);
+                  if (error) setError('');
+                }}
+                keyboardType="phone-pad"
+                maxLength={10}
+                style={styles.textInput}
+              />
             </View>
 
-            {/* Test Helper Pill */}
-            <View style={styles.helperTip}>
-              <Ionicons name="information-circle" size={16} color={colors.info} />
-              <Text style={styles.helperTipText}>
-                Demo Mode: Default mock number loaded. Any 10-digit number is accepted.
-              </Text>
-            </View>
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-            <Button
-              title="Send OTP"
+            <PrimaryButton
+              title="Send Verification Code"
               onPress={handleContinue}
-              variant="primary"
               size="lg"
               fullWidth
               loading={isLoading}
-              icon={<Ionicons name="lock-closed" size={18} color={colors.textInverse} />}
+              icon={<Ionicons name="shield-checkmark-outline" size={18} color="#FFFFFF" />}
               style={styles.continueBtn}
             />
 
             <View style={styles.termsBox}>
               <Text style={styles.termsText}>
-                By tapping Continue, you agree to our{' '}
-                <Text style={styles.linkText}>Partner Terms</Text> and{' '}
+                By signing in, you agree to our{' '}
+                <Text style={styles.linkText}>Partner Agreement</Text> and{' '}
                 <Text style={styles.linkText}>Privacy Policy</Text>.
               </Text>
             </View>
-          </View>
+          </PremiumCard>
 
           {/* New Worker Onboarding Callout */}
           <View style={styles.registerFooter}>
-            <Text style={styles.registerText}>Want to register a new service business?</Text>
+            <Text style={styles.registerText}>Want to register a new trade account?</Text>
             <TouchableOpacity
               onPress={() => navigation.navigate('CreateAccount', { phoneNumber })}
               activeOpacity={0.7}
             >
-              <Text style={styles.registerLink}>Register as New Worker</Text>
+              <Text style={styles.registerLink}>Register as New Partner</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -174,93 +164,86 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginBottom: spacing.xxl,
+    marginBottom: spacing.xl,
   },
   iconCircle: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: colors.primaryLighter,
+    backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
   },
-  title: {
-    ...typography.h1,
+  brandTitle: {
+    fontSize: 24,
+    fontWeight: '900',
     color: colors.textPrimary,
-    textAlign: 'center',
+    letterSpacing: -0.5,
   },
   subtitle: {
-    ...typography.body2,
+    fontSize: 13,
     color: colors.textSecondary,
     textAlign: 'center',
     marginTop: spacing.xs,
     maxWidth: 290,
-    lineHeight: 20,
+    lineHeight: 18,
   },
   card: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    ...shadows.md,
+    marginBottom: spacing.md,
+  },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: 8,
   },
   phoneInputRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  countryCodeBox: {
-    flexDirection: 'row',
     alignItems: 'center',
-    height: 52,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1.5,
+    height: 50,
+    backgroundColor: colors.background,
+    borderWidth: 1,
     borderColor: colors.border,
     borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.sm,
+  },
+  inputRowError: {
+    borderColor: colors.danger,
+  },
+  countryCodeBox: {
+    paddingHorizontal: spacing.sm,
+    borderRightWidth: 1,
+    borderRightColor: colors.border,
     marginRight: spacing.sm,
   },
-  flag: {
-    fontSize: 18,
-    marginRight: 4,
-  },
   countryCodeText: {
-    ...typography.subtitle1,
+    fontSize: 15,
     color: colors.textPrimary,
     fontWeight: '700',
   },
-  numberInputContainer: {
+  textInput: {
     flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    height: '100%',
   },
-  inputWrapper: {
-    marginBottom: 0,
-  },
-  helperTip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.infoLight,
-    padding: spacing.md,
-    borderRadius: borderRadius.md,
-    marginVertical: spacing.md,
-  },
-  helperTipText: {
-    ...typography.caption,
-    color: colors.info,
-    marginLeft: spacing.xs + 2,
-    flex: 1,
-    lineHeight: 16,
+  errorText: {
+    fontSize: 11,
+    color: colors.danger,
+    marginTop: 6,
   },
   continueBtn: {
-    marginTop: spacing.sm,
+    marginTop: spacing.lg,
   },
   termsBox: {
     marginTop: spacing.md,
     alignItems: 'center',
   },
   termsText: {
-    ...typography.caption,
-    color: colors.textMuted,
+    fontSize: 11,
+    color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 16,
   },
@@ -270,14 +253,14 @@ const styles = StyleSheet.create({
   },
   registerFooter: {
     alignItems: 'center',
-    marginTop: spacing.xxl,
+    marginTop: spacing.xl,
   },
   registerText: {
-    ...typography.body2,
+    fontSize: 13,
     color: colors.textSecondary,
   },
   registerLink: {
-    ...typography.subtitle2,
+    fontSize: 13,
     color: colors.primary,
     fontWeight: '700',
     marginTop: 4,

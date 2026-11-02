@@ -73,7 +73,7 @@ class FirebaseAuthService {
     return {
       user: {
         uid: `firebase_usr_${Date.now()}`,
-        phoneNumber: this.currentPhoneNumber || '+919876543210',
+        phoneNumber: this.currentPhoneNumber || '',
       },
       idToken: `mock_firebase_jwt_token_${Date.now()}`,
     };

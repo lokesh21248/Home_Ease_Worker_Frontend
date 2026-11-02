@@ -3,21 +3,22 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
   TouchableOpacity,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { borderRadius, shadows, spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-import Button from '../../components/Button';
+import { CustomHeader } from '../../components/CustomHeader';
+import { PremiumCard } from '../../components/PremiumCard';
+import { PrimaryButton } from '../../components/PrimaryButton';
 import Input from '../../components/Input';
-import Header from '../../components/Header';
 import { useApp } from '../../state/AppContext';
 import { workerApiService } from '../../api/workerApiService';
 
@@ -26,16 +27,14 @@ type Props = NativeStackScreenProps<RootStackParamList, 'CreateAccount'>;
 export const CreateAccountScreen: React.FC<Props> = ({ navigation, route }) => {
   const { worker, updateWorkerProfile } = useApp();
 
-  const [fullName, setFullName] = useState(worker.name || 'Ramesh Kumar');
+  const [fullName, setFullName] = useState(worker.name || '');
   const [phoneNumber, setPhoneNumber] = useState(
-    route.params?.phoneNumber || worker.phone || '+919123456780'
+    route.params?.phoneNumber || worker.phone || ''
   );
-  const [email, setEmail] = useState(worker.email || 'ramesh@partner.homeease.com');
-  const [address, setAddress] = useState(
-    worker.address || 'Flat 204, Sai Residency, Hitec City, Hyderabad'
-  );
+  const [email, setEmail] = useState(worker.email || '');
+  const [address, setAddress] = useState(worker.address || '');
   const [gender, setGender] = useState<'Male' | 'Female' | 'Other'>(worker.gender || 'Male');
-  const [dob, setDob] = useState(worker.dob || '1992-08-15');
+  const [dob, setDob] = useState(worker.dob || '');
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -71,7 +70,6 @@ export const CreateAccountScreen: React.FC<Props> = ({ navigation, route }) => {
       dob,
     });
 
-    // End-to-end Backend Register Worker: POST /users/register
     try {
       await workerApiService.registerWorker(payload);
     } catch (err: any) {
@@ -82,25 +80,28 @@ export const CreateAccountScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header
-        title="Create Worker Profile"
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <CustomHeader
+        title="Create Partner Profile"
         subtitle="Step 1 of 5 • Basic Details"
         showBack
         onBack={() => navigation.goBack()}
       />
 
+      {/* Progress Indicator */}
+      <View style={styles.progressBarContainer}>
+        <View style={[styles.progressFill, { width: '20%' }]} />
+      </View>
+
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {/* Progress Indicator */}
-          <View style={styles.progressBarContainer}>
-            <View style={[styles.progressFill, { width: '20%' }]} />
-          </View>
-
-          <View style={styles.card}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <PremiumCard style={styles.card}>
             <Text style={styles.cardHeading}>Personal Information</Text>
             <Text style={styles.cardSub}>
               Ensure your name matches your government Aadhaar / PAN card.
@@ -110,13 +111,13 @@ export const CreateAccountScreen: React.FC<Props> = ({ navigation, route }) => {
             <Input
               label="Full Legal Name"
               required
-              placeholder="e.g. Ramesh Kumar"
+              placeholder="Enter your full legal name"
               value={fullName}
               onChangeText={(text) => {
                 setFullName(text);
                 if (errors.fullName) setErrors({ ...errors, fullName: '' });
               }}
-              leftIcon={<Ionicons name="person-outline" size={20} color={colors.primary} />}
+              leftIcon={<Ionicons name="person-outline" size={18} color={colors.primary} />}
               error={errors.fullName}
             />
 
@@ -131,7 +132,7 @@ export const CreateAccountScreen: React.FC<Props> = ({ navigation, route }) => {
                 if (errors.phoneNumber) setErrors({ ...errors, phoneNumber: '' });
               }}
               keyboardType="phone-pad"
-              leftIcon={<Ionicons name="call-outline" size={20} color={colors.primary} />}
+              leftIcon={<Ionicons name="call-outline" size={18} color={colors.primary} />}
               error={errors.phoneNumber}
             />
 
@@ -147,11 +148,11 @@ export const CreateAccountScreen: React.FC<Props> = ({ navigation, route }) => {
               }}
               keyboardType="email-address"
               autoCapitalize="none"
-              leftIcon={<Ionicons name="mail-outline" size={20} color={colors.primary} />}
+              leftIcon={<Ionicons name="mail-outline" size={18} color={colors.primary} />}
               error={errors.email}
             />
 
-            {/* Residential / Work Base Address */}
+            {/* Operating Address */}
             <Input
               label="Operating / Residential Address"
               required
@@ -161,9 +162,9 @@ export const CreateAccountScreen: React.FC<Props> = ({ navigation, route }) => {
                 setAddress(text);
                 if (errors.address) setErrors({ ...errors, address: '' });
               }}
-              leftIcon={<Ionicons name="home-outline" size={20} color={colors.primary} />}
+              leftIcon={<Ionicons name="home-outline" size={18} color={colors.primary} />}
               error={errors.address}
-              helperText="Required for backend KYC & partner dispatch verification"
+              helperText="Required for partner dispatch radius"
             />
 
             {/* Gender Selector */}
@@ -214,23 +215,21 @@ export const CreateAccountScreen: React.FC<Props> = ({ navigation, route }) => {
                 setDob(text);
                 if (errors.dob) setErrors({ ...errors, dob: '' });
               }}
-              leftIcon={<Ionicons name="calendar-outline" size={20} color={colors.primary} />}
+              leftIcon={<Ionicons name="calendar-outline" size={18} color={colors.primary} />}
               error={errors.dob}
-              helperText="Must be 18+ years old to register as partner"
+              helperText="Must be 18+ years old to register"
             />
-          </View>
+          </PremiumCard>
         </ScrollView>
       </KeyboardAvoidingView>
 
       <View style={styles.footer}>
-        <Button
+        <PrimaryButton
           title="Save & Continue"
-          variant="primary"
           size="lg"
           fullWidth
           onPress={handleContinue}
-          icon={<Ionicons name="arrow-forward" size={18} color={colors.textInverse} />}
-          iconPosition="right"
+          iconRight={<Ionicons name="arrow-forward-outline" size={18} color="#FFFFFF" />}
         />
       </View>
     </SafeAreaView>
@@ -243,44 +242,40 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   progressBarContainer: {
-    height: 4,
+    height: 3,
     backgroundColor: colors.border,
     width: '100%',
-    marginBottom: spacing.lg,
   },
   progressFill: {
     height: '100%',
     backgroundColor: colors.primary,
   },
   scrollContent: {
-    padding: spacing.lg,
+    padding: spacing.md,
     paddingBottom: spacing.xxl,
   },
   card: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    ...shadows.sm,
+    marginBottom: spacing.md,
   },
   cardHeading: {
-    ...typography.h3,
+    fontSize: 16,
+    fontWeight: '800',
     color: colors.textPrimary,
   },
   cardSub: {
-    ...typography.body2,
+    fontSize: 12,
     color: colors.textSecondary,
     marginTop: 2,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   genderSection: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   fieldLabel: {
-    ...typography.subtitle2,
+    fontSize: 13,
+    fontWeight: '600',
     color: colors.textPrimary,
-    marginBottom: spacing.xs + 2,
+    marginBottom: 6,
   },
   genderRow: {
     flexDirection: 'row',
@@ -291,19 +286,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 48,
+    height: 44,
     borderRadius: borderRadius.md,
-    borderWidth: 1.5,
+    backgroundColor: colors.background,
+    borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-    gap: spacing.xs,
+    gap: 6,
   },
   genderOptionSelected: {
     borderColor: colors.primary,
-    backgroundColor: colors.primaryLighter,
+    backgroundColor: colors.primaryLight,
   },
   genderText: {
-    ...typography.subtitle2,
+    fontSize: 13,
+    fontWeight: '600',
     color: colors.textSecondary,
   },
   genderTextSelected: {
@@ -311,10 +307,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   footer: {
-    padding: spacing.lg,
-    backgroundColor: colors.surface,
+    padding: spacing.md,
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
+    borderTopColor: colors.border,
   },
 });
 

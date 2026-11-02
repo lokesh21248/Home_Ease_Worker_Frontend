@@ -3,82 +3,195 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   FlatList,
   TouchableOpacity,
+  ScrollView,
   RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
-import { borderRadius, spacing } from '../../theme/spacing';
+import { borderRadius, shadows, spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-import Header from '../../components/Header';
-import JobCard from '../../components/JobCard';
-import EmptyState from '../../components/EmptyState';
+import { CustomHeader } from '../../components/CustomHeader';
+import { BookingCard } from '../../components/BookingCard';
+import { EmptyState } from '../../components/EmptyState';
 import { useApp } from '../../state/AppContext';
 import { resolveBookingUuid } from '../../utils/uuid';
+import { Job } from '../../types';
+
+type TabType = 'All' | 'Requests' | 'Active' | 'Scheduled' | 'Completed';
 
 export const JobsTabScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { jobRequests, activeJob, completedJobs, acceptJob, rejectJob, fetchJobRequests } = useApp();
+  const {
+    jobRequests,
+    activeJob,
+    completedJobs,
+    acceptJob,
+    rejectJob,
+    fetchJobRequests,
+    fetchSchedules,
+  } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'All' | 'Requests' | 'Active' | 'Completed'>('All');
+  const [activeTab, setActiveTab] = useState<TabType>('All');
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await fetchJobRequests();
-    setIsRefreshing(false);
+    try {
+      await Promise.all([
+        fetchJobRequests().catch(() => {}),
+        fetchSchedules().catch(() => {}),
+      ]);
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
-  const getJobsList = () => {
+  const scheduledJobs = [...(activeJob ? [activeJob] : []), ...jobRequests].filter(
+    (j) => j.bookingType === 'SCHEDULED' || (j.scheduledDate && j.scheduledDate !== 'Today')
+  );
+
+  const getDedupedAllJobs = (): Job[] => {
+    const seen = new Set<string>();
+    const deduped: Job[] = [];
+    for (const job of [
+      ...(activeJob ? [activeJob] : []),
+      ...jobRequests,
+      ...completedJobs,
+    ]) {
+      const key = job.bookingId || job.id;
+      if (!seen.has(key)) {
+        seen.add(key);
+        deduped.push(job);
+      }
+    }
+    return deduped;
+  };
+
+  const getJobsList = (): Job[] => {
     switch (activeTab) {
       case 'Requests':
         return jobRequests;
       case 'Active':
         return activeJob ? [activeJob] : [];
+      case 'Scheduled':
+        return scheduledJobs;
       case 'Completed':
         return completedJobs;
       case 'All':
       default:
-        return [
-          ...(activeJob ? [activeJob] : []),
-          ...jobRequests,
-          ...completedJobs,
-        ];
+        return getDedupedAllJobs();
     }
   };
 
   const jobsToDisplay = getJobsList();
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <Header
-        title="Jobs & Bookings"
-        subtitle={`${jobRequests.length} pending • ${activeJob ? '1 in progress' : '0 in progress'}`}
-      />
+  const tabs: { key: TabType; label: string; count: number }[] = [
+    { key: 'All', label: 'All', count: getDedupedAllJobs().length },
+    { key: 'Requests', label: 'Requests', count: jobRequests.length },
+    { key: 'Active', label: 'Active', count: activeJob ? 1 : 0 },
+    { key: 'Scheduled', label: 'Scheduled', count: scheduledJobs.length },
+    { key: 'Completed', label: 'Completed', count: completedJobs.length },
+  ];
 
-      {/* Filter Tabs */}
-      <View style={styles.tabRow}>
-        {(['All', 'Requests', 'Active', 'Completed'] as const).map((tab) => (
+  const handleJobPress = (item: Job) => {
+    const isOngoing =
+      item.status === 'started' ||
+      item.status === 'accepted' ||
+      item.status === 'travelling' ||
+      item.status === 'arrived';
+
+    if (isOngoing) {
+      const bookingId = resolveBookingUuid(item.bookingId, item.id);
+      navigation.navigate('ActiveJob', { job: { ...item, bookingId }, bookingId });
+    } else {
+      navigation.navigate('JobDetails', { job: item });
+    }
+  };
+
+  const handleAccept = (item: Job) => {
+    const bookingId = resolveBookingUuid(item.bookingId, item.id);
+    acceptJob(bookingId);
+    navigation.navigate('ActiveJob', {
+      job: { ...item, id: bookingId, bookingId, status: 'accepted' },
+      bookingId,
+    });
+  };
+
+  const handleReject = (item: Job) => {
+    rejectJob(item.id);
+  };
+
+  const handleNavigate = (item: Job) => {
+    navigation.navigate('NavigationTracking', { job: item });
+  };
+
+  return (
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Top Header */}
+      <CustomHeader
+        title="Jobs & Bookings"
+        subtitle={`${jobRequests.length} pending • ${activeJob ? '1 active job' : 'Available for orders'}`}
+        rightAction={
           <TouchableOpacity
-            key={tab}
-            onPress={() => setActiveTab(tab)}
-            style={[styles.tabBtn, activeTab === tab && styles.tabBtnActive]}
+            style={styles.headerRefreshBtn}
+            onPress={handleRefresh}
             activeOpacity={0.7}
           >
-            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-              {tab}
-            </Text>
+            <Ionicons name="reload-outline" size={18} color={colors.primary} />
           </TouchableOpacity>
-        ))}
+        }
+      />
+
+      {/* Filter Tabs Bar */}
+      <View style={styles.tabsWrapper}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabsContent}
+        >
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.key;
+            return (
+              <TouchableOpacity
+                key={tab.key}
+                onPress={() => setActiveTab(tab.key)}
+                style={[styles.tabChip, isActive && styles.tabChipActive]}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
+                  {tab.label}
+                </Text>
+                <View
+                  style={[
+                    styles.tabBadge,
+                    isActive ? styles.tabBadgeActive : styles.tabBadgeInactive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.tabBadgeText,
+                      isActive ? styles.tabBadgeTextActive : styles.tabBadgeTextInactive,
+                    ]}
+                  >
+                    {tab.count}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
+      {/* Main Jobs List */}
       <FlatList
         data={jobsToDisplay}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.bookingId || item.id}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -90,30 +203,27 @@ export const JobsTabScreen: React.FC = () => {
           />
         }
         renderItem={({ item }) => (
-          <JobCard
+          <BookingCard
             job={item}
-            onPress={() => {
-              if (item.status === 'started' || item.status === 'accepted' || item.status === 'travelling' || item.status === 'arrived') {
-                const bookingId = resolveBookingUuid(item.bookingId, item.id);
-                navigation.navigate('ActiveJob', { job: { ...item, bookingId }, bookingId });
-              } else {
-                navigation.navigate('JobDetails', { job: item });
-              }
-            }}
-            onAccept={() => {
-              const bookingId = resolveBookingUuid(item.bookingId, item.id);
-              acceptJob(bookingId);
-              navigation.navigate('ActiveJob', { job: { ...item, id: bookingId, bookingId, status: 'accepted' }, bookingId });
-            }}
-            onReject={() => rejectJob(item.id)}
-            onNavigate={() => navigation.navigate('NavigationTracking', { job: item })}
+            onPress={() => handleJobPress(item)}
+            onAccept={() => handleAccept(item)}
+            onReject={() => handleReject(item)}
+            onNavigate={() => handleNavigate(item)}
           />
         )}
         ListEmptyComponent={
           <EmptyState
-            iconName="briefcase-outline"
-            title="No Jobs Found"
-            description={`You do not have any bookings under the "${activeTab}" tab.`}
+            icon="briefcase-outline"
+            title={`No ${activeTab} Jobs`}
+            description={
+              activeTab === 'Requests'
+                ? 'No pending service requests right now. Stay online to receive instant bookings nearby.'
+                : activeTab === 'Active'
+                ? 'No service job currently in progress. Accept an incoming request to start.'
+                : `You currently do not have any bookings under "${activeTab}".`
+            }
+            actionLabel={activeTab === 'Requests' ? 'Refresh Requests' : undefined}
+            onAction={activeTab === 'Requests' ? handleRefresh : undefined}
           />
         }
       />
@@ -126,37 +236,75 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  tabRow: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.surface,
-    gap: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
+  headerRefreshBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  tabBtn: {
+  tabsWrapper: {
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  tabsContent: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 2,
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+    flexDirection: 'row',
+  },
+  tabChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 3,
     borderRadius: borderRadius.full,
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: colors.border,
   },
-  tabBtnActive: {
+  tabChipActive: {
     backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
-  tabText: {
-    ...typography.caption,
+  tabLabel: {
+    fontSize: 13,
+    fontWeight: '600',
     color: colors.textSecondary,
+    marginRight: 6,
+  },
+  tabLabelActive: {
+    color: '#FFFFFF',
     fontWeight: '700',
   },
-  tabTextActive: {
-    color: colors.textInverse,
+  tabBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 10,
+    minWidth: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabBadgeActive: {
+    backgroundColor: colors.secondary,
+  },
+  tabBadgeInactive: {
+    backgroundColor: colors.primaryLight,
+  },
+  tabBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  tabBadgeTextActive: {
+    color: '#FFFFFF',
+  },
+  tabBadgeTextInactive: {
+    color: colors.primary,
   },
   listContent: {
-    padding: spacing.lg,
+    padding: spacing.md,
     paddingBottom: spacing.xxl,
   },
 });

@@ -3,22 +3,23 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   Image,
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { borderRadius, shadows, spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-import Button from '../../components/Button';
+import { CustomHeader } from '../../components/CustomHeader';
+import { PremiumCard } from '../../components/PremiumCard';
+import { PrimaryButton } from '../../components/PrimaryButton';
 import Input from '../../components/Input';
-import Header from '../../components/Header';
 import { useApp } from '../../state/AppContext';
 import { workerApiService } from '../../api/workerApiService';
 
@@ -33,15 +34,12 @@ export const ProfileSetupScreen: React.FC<Props> = ({ navigation }) => {
     worker.photoUri || 'https://images.unsplash.com/photo-1540569014015-19a7be504e3a?w=400&q=80'
   );
   const [experienceYears, setExperienceYears] = useState(
-    String(worker.experienceYears || 5)
+    worker.experienceYears ? String(worker.experienceYears) : ''
   );
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>(
-    worker.languages || ['English', 'Hindi', 'Telugu']
+    worker.languages || ['English', 'Hindi']
   );
-  const [bio, setBio] = useState(
-    worker.bio ||
-      'Expert Home Cleaning & Maintenance Professional with 5+ years of verified on-site experience.'
-  );
+  const [bio, setBio] = useState(worker.bio || '');
 
   const toggleLanguage = (lang: string) => {
     if (selectedLanguages.includes(lang)) {
@@ -52,9 +50,8 @@ export const ProfileSetupScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const handleContinue = async () => {
-    const workerId = worker.id || '6f2e1a3b-4c5d-6e7f-6a9b-1c2d3e4f5a6b';
+    const workerId = worker.id || '';
 
-    // End-to-end Backend Upload Profile Photo: POST /upload/worker-profile/{workerId}
     try {
       const uploadRes = await workerApiService.uploadWorkerProfilePhoto(workerId, photoUri);
       if (uploadRes?.url) {
@@ -75,67 +72,67 @@ export const ProfileSetupScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <CustomHeader
         title="Professional Profile"
-        subtitle="Step 2 of 5 • Experience & Bio"
+        subtitle="Step 2 of 5 • Photo & Bio"
         showBack
         onBack={() => navigation.goBack()}
       />
+
+      <View style={styles.progressBarContainer}>
+        <View style={[styles.progressFill, { width: '40%' }]} />
+      </View>
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {/* Progress bar */}
-          <View style={styles.progressBarContainer}>
-            <View style={[styles.progressFill, { width: '40%' }]} />
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Avatar Upload Box */}
+          <View style={styles.avatarSection}>
+            <View style={styles.avatarWrapper}>
+              <Image source={{ uri: photoUri }} style={styles.avatarImage} />
+              <TouchableOpacity
+                style={styles.cameraCircle}
+                activeOpacity={0.8}
+                onPress={() => {
+                  setPhotoUri(
+                    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80'
+                  );
+                }}
+              >
+                <Ionicons name="camera-outline" size={16} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.avatarHint}>Professional Profile Photo</Text>
+            <Text style={styles.avatarSubHint}>
+              Customers recognize and verify you via this photo.
+            </Text>
           </View>
 
-          {/* Avatar Selector Card */}
-          <View style={styles.card}>
-            <View style={styles.avatarSection}>
-              <View style={styles.avatarWrapper}>
-                <Image source={{ uri: photoUri }} style={styles.avatar} />
-                <TouchableOpacity
-                  style={styles.cameraIconBtn}
-                  activeOpacity={0.8}
-                  onPress={() => {
-                    // Toggle alternative clean avatar for demo
-                    setPhotoUri(
-                      photoUri.includes('1540569014015')
-                        ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80'
-                        : 'https://images.unsplash.com/photo-1540569014015-19a7be504e3a?w=400&q=80'
-                    );
-                  }}
-                >
-                  <Ionicons name="camera" size={16} color={colors.textInverse} />
-                </TouchableOpacity>
-              </View>
-              <Text style={styles.avatarLabel}>Tap camera to switch photo</Text>
-              <Text style={styles.avatarSub}>
-                Upload a clear portrait facing forward with good lighting.
-              </Text>
-            </View>
-
-            {/* Experience in Years */}
+          <PremiumCard style={styles.card}>
+            {/* Experience */}
             <Input
-              label="Work Experience (in Years)"
-              required
+              label="Years of Work Experience"
               placeholder="e.g. 5"
               value={experienceYears}
               onChangeText={setExperienceYears}
               keyboardType="number-pad"
-              maxLength={2}
-              leftIcon={<Ionicons name="ribbon-outline" size={20} color={colors.primary} />}
-              helperText="Years of hands-on professional service"
+              leftIcon={<Ionicons name="ribbon-outline" size={18} color={colors.primary} />}
+              helperText="Experience boosts your ranking for high-value dispatches"
             />
 
-            {/* Languages Known */}
+            {/* Language Chips */}
             <View style={styles.langSection}>
-              <Text style={styles.fieldLabel}>Languages You Speak *</Text>
-              <View style={styles.chipsRow}>
+              <Text style={styles.fieldLabel}>Spoken Languages</Text>
+              <Text style={styles.fieldSub}>
+                Select all languages you can comfortably speak with customers:
+              </Text>
+              <View style={styles.langChipsRow}>
                 {AVAILABLE_LANGUAGES.map((lang) => {
                   const isSelected = selectedLanguages.includes(lang);
                   return (
@@ -143,23 +140,18 @@ export const ProfileSetupScreen: React.FC<Props> = ({ navigation }) => {
                       key={lang}
                       onPress={() => toggleLanguage(lang)}
                       style={[
-                        styles.chip,
-                        isSelected && styles.chipSelected,
+                        styles.langChip,
+                        isSelected && styles.langChipSelected,
                       ]}
                       activeOpacity={0.7}
                     >
-                      {isSelected && (
-                        <Ionicons
-                          name="checkmark"
-                          size={14}
-                          color={colors.primary}
-                          style={{ marginRight: 4 }}
-                        />
-                      )}
+                      {isSelected ? (
+                        <Ionicons name="checkmark" size={12} color="#FFFFFF" style={{ marginRight: 4 }} />
+                      ) : null}
                       <Text
                         style={[
-                          styles.chipText,
-                          isSelected && styles.chipTextSelected,
+                          styles.langChipText,
+                          isSelected && styles.langChipTextSelected,
                         ]}
                       >
                         {lang}
@@ -170,31 +162,28 @@ export const ProfileSetupScreen: React.FC<Props> = ({ navigation }) => {
               </View>
             </View>
 
-            {/* Professional Bio */}
+            {/* Bio / Description */}
             <Input
-              label="Professional Bio / Introduction"
-              required
-              placeholder="e.g. Expert Home Cleaning Professional with specialized skills..."
+              label="Short Bio / Introduction"
+              placeholder="Certified technician with 5+ years of experience in prompt home service..."
               value={bio}
               onChangeText={setBio}
               multiline
-              numberOfLines={4}
-              inputStyle={styles.bioInput}
-              helperText="This is shown to customers when you accept their job"
+              numberOfLines={3}
+              inputStyle={{ minHeight: 70, textAlignVertical: 'top' }}
+              helperText="Visible on your public partner card"
             />
-          </View>
+          </PremiumCard>
         </ScrollView>
       </KeyboardAvoidingView>
 
       <View style={styles.footer}>
-        <Button
-          title="Save & Proceed to Documents"
-          variant="primary"
+        <PrimaryButton
+          title="Save & Continue"
           size="lg"
           fullWidth
           onPress={handleContinue}
-          icon={<Ionicons name="arrow-forward" size={18} color={colors.textInverse} />}
-          iconPosition="right"
+          iconRight={<Ionicons name="arrow-forward-outline" size={18} color="#FFFFFF" />}
         />
       </View>
     </SafeAreaView>
@@ -207,115 +196,108 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   progressBarContainer: {
-    height: 4,
+    height: 3,
     backgroundColor: colors.border,
     width: '100%',
-    marginBottom: spacing.lg,
   },
   progressFill: {
     height: '100%',
     backgroundColor: colors.primary,
   },
   scrollContent: {
-    padding: spacing.lg,
+    padding: spacing.md,
     paddingBottom: spacing.xxl,
-  },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    ...shadows.sm,
   },
   avatarSection: {
     alignItems: 'center',
-    marginBottom: spacing.xl,
+    marginVertical: spacing.md,
   },
   avatarWrapper: {
     position: 'relative',
-    width: 96,
-    height: 96,
+    marginBottom: spacing.xs,
   },
-  avatar: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    borderWidth: 3,
+  avatarImage: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    borderWidth: 2,
     borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
   },
-  cameraIconBtn: {
+  cameraCircle: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: colors.surface,
-    ...shadows.sm,
+    borderColor: '#FFFFFF',
   },
-  avatarLabel: {
-    ...typography.subtitle2,
-    color: colors.primary,
-    marginTop: spacing.sm,
+  avatarHint: {
+    fontSize: 14,
     fontWeight: '700',
+    color: colors.textPrimary,
   },
-  avatarSub: {
-    ...typography.caption,
+  avatarSubHint: {
+    fontSize: 11,
     color: colors.textSecondary,
     textAlign: 'center',
     marginTop: 2,
-    maxWidth: 240,
   },
-  fieldLabel: {
-    ...typography.subtitle2,
-    color: colors.textPrimary,
-    marginBottom: spacing.xs + 2,
+  card: {
+    marginBottom: spacing.md,
   },
   langSection: {
-    marginBottom: spacing.lg,
+    marginVertical: spacing.sm,
   },
-  chipsRow: {
+  fieldLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: 2,
+  },
+  fieldSub: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+  langChipsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.sm,
+    gap: spacing.xs + 2,
   },
-  chip: {
+  langChip: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: 6,
     borderRadius: borderRadius.full,
-    borderWidth: 1.5,
+    backgroundColor: colors.background,
+    borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
   },
-  chipSelected: {
+  langChipSelected: {
+    backgroundColor: colors.primary,
     borderColor: colors.primary,
-    backgroundColor: colors.primaryLighter,
   },
-  chipText: {
-    ...typography.body2,
-    color: colors.textSecondary,
-    fontWeight: '600',
+  langChipText: {
+    fontSize: 12,
+    color: colors.textPrimary,
+    fontWeight: '500',
   },
-  chipTextSelected: {
-    color: colors.primary,
+  langChipTextSelected: {
+    color: '#FFFFFF',
     fontWeight: '700',
   },
-  bioInput: {
-    minHeight: 88,
-    textAlignVertical: 'top',
-  },
   footer: {
-    padding: spacing.lg,
-    backgroundColor: colors.surface,
+    padding: spacing.md,
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
+    borderTopColor: colors.border,
   },
 });
 

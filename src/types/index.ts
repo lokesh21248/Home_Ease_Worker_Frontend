@@ -51,6 +51,7 @@ export interface WorkerAvailability {
 
 export interface WorkerProfile {
   id: string; // UUID (matches backend userId / workerId)
+  userId?: string; // Backend User UUID
   name: string; // maps to fullName
   phone: string; // maps to phoneNumber (+91...)
   countryCode: string;
@@ -108,6 +109,9 @@ export interface Job {
   location: JobLocation;
   scheduledDate: string;
   scheduledTime: string;
+  scheduledEndAt?: string;
+  bookingType?: 'INSTANT' | 'SCHEDULED';
+  estimatedArrivalMinutes?: number;
   price: number;
   totalAmount?: number; // Backend booking totalAmount
   commission: number;
@@ -242,5 +246,54 @@ export interface BackendEarningsResponse {
   totalCommissionPaid: number;
   netPayout: number;
   completedBookingsCount: number;
+}
+
+// Dual Booking & Worker Availability Types
+// Dual Booking & Worker Availability Types
+export interface DaySchedule {
+  dayOfWeek: number; // 1 = Monday, 7 = Sunday
+  dayName: string;   // "Monday", "Tuesday", etc.
+  isAvailable: boolean;
+  startTime: string; // "08:00"
+  endTime: string;   // "20:00"
+  breakStartTime?: string; // "13:00"
+  breakEndTime?: string;   // "14:00"
+  slotDurationMins: number; // 60
+}
+
+export interface TimeOffItem {
+  timeOffId: string;
+  startDate: string; // YYYY-MM-DD
+  endDate: string;   // YYYY-MM-DD
+  reason?: string;
+  createdAt?: string;
+}
+
+export interface WorkerScheduleSlot {
+  bookingId: string;
+  serviceName: string;
+  customerName: string;
+  customerPhone: string;
+  address: string;
+  timeWindow: string;
+  status: string;
+  scheduledAt: string;
+  scheduledEndAt: string;
+  bookingType: 'INSTANT' | 'SCHEDULED' | string;
+  isAvailable: boolean;
+  slotDurationMins?: number;
+  bookingUuid?: string;
+}
+
+export interface WorkerTodaySchedule {
+  date: string;
+  totalJobsToday: number;
+  completedCount: number;
+  schedule: WorkerScheduleSlot[];
+}
+
+export interface WorkerAllSchedule {
+  today: WorkerTodaySchedule;
+  upcoming: WorkerScheduleSlot[];
 }
 

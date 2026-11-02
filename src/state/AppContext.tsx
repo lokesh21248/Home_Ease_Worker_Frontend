@@ -2,15 +2,19 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
   WorkerProfile,
   ServiceCategory,
+  SubService,
   DocumentItem,
   Job,
   JobStatus,
   BankDetails,
   AppSettings,
   NotificationItem,
+  DaySchedule,
+  TimeOffItem,
+  WorkerScheduleSlot,
+  WorkerTodaySchedule,
 } from '../types';
 import { mockServices, mockInitialWorker, mockDocuments, mockBankDetails } from '../mock/workers';
-import { mockJobs } from '../mock/jobs';
 import { mockEarningsData, EarningPeriodData } from '../mock/earnings';
 import { mockWalletData, WalletState } from '../mock/wallet';
 import { mockReviewsData, RatingOverview } from '../mock/reviews';
@@ -22,6 +26,9 @@ import { storageService } from '../services/storageService';
 import { alertFeedbackService } from '../services/alertFeedbackService';
 import { resolveBookingUuid } from '../utils/uuid';
 import { mapBackendBookingToJob } from '../utils/bookingMapper';
+import { locationService, LocationData, GpsStatus } from '../services/locationService';
+import { webSocketService } from '../services/webSocketService';
+import { Alert } from 'react-native';
 
 interface AppContextType {
   // Auth & Session
@@ -37,6 +44,19 @@ interface AppContextType {
   toggleServiceSelection: (serviceId: string) => void;
   updateAvailability: (availability: WorkerProfile['availability']) => void;
   toggleOnlineStatus: () => Promise<void> | void;
+  weeklySchedule: DaySchedule[];
+  timeOffList: TimeOffItem[];
+  todaySchedule: WorkerTodaySchedule | null;
+  upcomingSchedule: WorkerScheduleSlot[];
+  allScheduleSlots: WorkerScheduleSlot[];
+  fetchAvailabilityData: () => Promise<void>;
+  saveWeeklySchedule: (schedule: DaySchedule[]) => Promise<boolean>;
+  addWorkerTimeOff: (startDate: string, endDate: string, reason?: string) => Promise<boolean>;
+  deleteWorkerTimeOff: (id: string) => Promise<boolean>;
+  fetchSchedules: () => Promise<void>;
+  fetchAllScheduleSlots: () => Promise<void>;
+  updateSlotStatus: (bookingId: string, status: string) => Promise<void>;
+  setSlotAvailability: (bookingId: string, isAvailable: boolean) => void;
 
   // Documents & KYC
   documents: DocumentItem[];
@@ -58,6 +78,17 @@ interface AppContextType {
   verifyJobPin: (jobId: string, pinCode: string) => Promise<{ success: boolean; message: string; errorCode?: string; data?: any }>;
   addSubServiceToJob: (jobId: string, subServiceId: string, quantity: number) => Promise<{ success: boolean; message: string }>;
   workerLocation: { lat: number; lng: number };
+  locationData: LocationData;
+  gpsStatus: GpsStatus;
+  refreshLocation: () => Promise<void>;
+  dashboardMetrics: {
+    todayJobs: number;
+    todayEarnings: number;
+    completedJobs: number;
+    pendingRequests: number;
+    activeJobs: number;
+    averageRating: number;
+  };
   completeActiveJob: (completionData: {
     beforeImageUri?: string;
     afterImageUri?: string;
@@ -103,29 +134,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [worker, setWorker] = useState<WorkerProfile>(mockInitialWorker);
 
   // Services & Documents
-  const [services] = useState<ServiceCategory[]>(mockServices);
+  const [services, setServices] = useState<ServiceCategory[]>(mockServices);
   const [documents, setDocuments] = useState<DocumentItem[]>(mockDocuments);
   const [bankDetails, setBankDetails] = useState<BankDetails>(mockBankDetails);
 
-  // Jobs State
-  const [jobRequests, setJobRequests] = useState<Job[]>(
-    mockJobs.filter((j) => j.status === 'requested')
-  );
-  const [activeJob, setActiveJob] = useState<Job | null>(
-    mockJobs.find((j) => j.status === 'started' || j.status === 'accepted' || j.status === 'travelling' || j.status === 'arrived') || null
-  );
-  const [completedJobs, setCompletedJobs] = useState<Job[]>(
-    mockJobs.filter((j) => j.status === 'completed')
-  );
+  // Jobs State (Live from backend, purged mock data)
+  const [jobRequests, setJobRequests] = useState<Job[]>([]);
+  const [activeJob, setActiveJob] = useState<Job | null>(null);
+  const [completedJobs, setCompletedJobs] = useState<Job[]>([]);
 
-  // Financials
+  // Financials & Notifications (Purged fake notifications)
   const [earnings, setEarnings] = useState(mockEarningsData);
   const [wallet, setWallet] = useState<WalletState>(mockWalletData);
   const [reviewsOverview] = useState<RatingOverview>(mockReviewsData);
-
-  // Notifications
-  const [notifications, setNotifications] = useState<NotificationItem[]>(mockNotifications);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [activeBannerAlert, setActiveBannerAlert] = useState<string | null>(null);
+
+  // Live Location & GPS
+  const [locationData, setLocationData] = useState<LocationData>({
+    latitude: 17.447812,
+    longitude: 78.373954,
+    locality: 'Madhapur',
+    city: 'Hyderabad',
+    fullAddress: 'Madhapur, Hyderabad',
+  });
+  const [gpsStatus, setGpsStatus] = useState<GpsStatus>('offline');
 
   // Settings
   const [settings, setSettings] = useState<AppSettings>({
@@ -135,6 +168,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     language: 'English',
     darkMode: false,
   });
+
+  // Availability & Scheduling State
+  const [weeklySchedule, setWeeklySchedule] = useState<DaySchedule[]>([]);
+  const [timeOffList, setTimeOffList] = useState<TimeOffItem[]>([]);
+  // Live Schedule & Slots
+  const [allScheduleSlots, setAllScheduleSlots] = useState<WorkerScheduleSlot[]>([]);
+  const [todaySchedule, setTodaySchedule] = useState<WorkerTodaySchedule | null>(null);
+  const [upcomingSchedule, setUpcomingSchedule] = useState<WorkerScheduleSlot[]>([]);
 
   const addNotification = (item: Omit<NotificationItem, 'id' | 'timestamp' | 'isRead'>) => {
     const newNotif: NotificationItem = {
@@ -162,6 +203,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     return unsubscribe;
   }, []);
+
+
+  /**
+   * Fetch Live Service Catalog from Backend: GET /services
+   * Replaces mock service IDs with real PostgreSQL database UUIDs
+   */
+  const fetchServicesCatalog = async () => {
+    try {
+      const liveServices = await workerApiService.getServices();
+      if (Array.isArray(liveServices) && liveServices.length > 0) {
+        const mappedServices: ServiceCategory[] = liveServices.map((item: any, index: number) => {
+          const serviceId = item.serviceId || item.id || `srv-${index}`;
+          const mockMatch = mockServices.find(
+            (m) => m.name.toLowerCase() === (item.name || '').toLowerCase()
+          );
+
+          const subServices: SubService[] = Array.isArray(item.subServices)
+            ? item.subServices.map((sub: any) => ({
+                id: sub.subServiceId || sub.id,
+                serviceCategoryId: serviceId,
+                name: sub.name,
+                description: sub.unitLabel || sub.description,
+                price: Number(sub.basePrice || sub.price || 199),
+              }))
+            : (mockMatch?.subServices || []);
+
+          return {
+            id: serviceId,
+            name: item.name,
+            icon: mockMatch?.icon || 'construct',
+            description: item.description || mockMatch?.description || '',
+            basePrice: subServices.length > 0 ? subServices[0].price : (item.basePrice || 299),
+            selected: worker.selectedServices.includes(serviceId),
+            subServices,
+          };
+        });
+
+        setServices(mappedServices);
+      }
+    } catch (err) {
+      console.info('[AppContext] fetchServicesCatalog notice:', err);
+    }
+  };
 
   // GPS Location Stream (matches backend POST /workers/location)
   const [workerLocation, setWorkerLocation] = useState<{ lat: number; lng: number }>({
@@ -217,8 +301,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         return profile;
       }
-    } catch (err) {
-      console.warn('[AppContext] fetchWorkerProfile error:', err);
+    } catch (err: any) {
+      const status: number | undefined = err?.status ?? err?.response?.status;
+      if (status === 401 || status === 403) {
+        // Session expired / invalid token -- re-throw so session restore can handle it
+        console.warn('[AppContext] fetchWorkerProfile: auth error, re-throwing', status);
+        throw err;
+      }
+      // Network / server errors: log but do not crash the UI -- UI still shows cached data
+      console.warn('[AppContext] fetchWorkerProfile error:', status, err?.message);
+      return null;
     }
     return null;
   };
@@ -230,12 +322,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const fetchJobRequests = async () => {
     try {
       const backendRequests = await workerApiService.getJobRequests();
-      if (Array.isArray(backendRequests) && backendRequests.length > 0) {
-        const mappedJobs = backendRequests.map(mapBackendBookingToJob);
+      if (Array.isArray(backendRequests)) {
+        // Deduplicate by stable bookingId to prevent duplicate React keys when backend returns repeated entries
+        const seen = new Set<string>();
+        const mappedJobs = backendRequests
+          .map(mapBackendBookingToJob)
+          .filter((j) => {
+            const key = j.bookingId || j.id;
+            if (!key || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
         setJobRequests((prev) => {
           const prevIds = new Set(prev.map((j) => j.bookingId || j.id));
           const hasNew = mappedJobs.some((j) => !prevIds.has(j.bookingId || j.id));
-          if (hasNew) {
+          if (hasNew && mappedJobs.length > 0) {
             alertFeedbackService.playJobAlertFeedback();
             setActiveBannerAlert(`⚡ New job dispatch available: ${mappedJobs[0].serviceName}`);
           }
@@ -244,6 +345,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     } catch (err) {
       console.warn('[AppContext] fetchJobRequests notice:', err);
+    }
+  };
+
+  const refreshLocation = async () => {
+    try {
+      const loc = await locationService.getCurrentLocation();
+      if (loc) {
+        setLocationData(loc);
+        setWorkerLocation({ lat: loc.latitude, lng: loc.longitude });
+        await workerApiService.updateLiveLocation(loc.latitude, loc.longitude);
+        alertFeedbackService.playTouchFeedback('light');
+        setActiveBannerAlert(`📍 Location refreshed: ${loc.locality}, ${loc.city}`);
+      }
+    } catch (e: any) {
+      console.warn('[AppContext] refreshLocation error:', e?.message);
     }
   };
 
@@ -261,6 +377,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
           // Fetch live worker profile from backend GET /workers/profile
           fetchWorkerProfile().catch(() => {});
+        } else if (worker?.id) {
+          apiClient.setUserId(worker.id);
         }
 
         const cachedJob = await storageService.loadActiveJob();
@@ -279,7 +397,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     };
     restorePersistedState();
+    fetchServicesCatalog();
+    fetchAvailabilityData();
+    fetchSchedules();
+    fcmService.getFCMToken().catch(() => {});
+
+    // Initialize current location silently
+    locationService.getCurrentLocation().then((loc) => {
+      if (loc) {
+        setLocationData(loc);
+        setWorkerLocation({ lat: loc.latitude, lng: loc.longitude });
+      }
+    }).catch(() => {});
   }, []);
+
+  // Real-time WebSocket Order Subscription
+  useEffect(() => {
+    const targetUserId = apiClient.getUserId() || worker.userId || worker.id || '1270d52d-9f4e-4399-9a80-15cab07f1763';
+    if (targetUserId) {
+      webSocketService.connect(targetUserId, worker.id);
+    }
+
+    const unsubWs = webSocketService.onNewJobRequest((payload) => {
+      console.log('[AppContext] Real-time job request received via WebSocket:', payload);
+      alertFeedbackService.playJobAlertFeedback();
+      const newJob = mapBackendBookingToJob(payload);
+      setJobRequests((prev) => {
+        const exists = prev.some((j) => (j.bookingId || j.id) === (newJob.bookingId || newJob.id));
+        if (exists) return prev;
+        return [newJob, ...prev];
+      });
+      setActiveBannerAlert(`⚡ New job dispatch: ${newJob.serviceName} (${newJob.jobId})`);
+      addNotification({
+        title: '⚡ New Service Order Request!',
+        body: `${newJob.serviceName} nearby in ${newJob.location.address}. Tap to view and accept.`,
+        type: 'job',
+        jobId: newJob.bookingId,
+      });
+    });
+
+    return () => {
+      unsubWs();
+    };
+  }, [worker.id, worker.userId]);
 
   // Low-Connectivity Caching: Persist active job whenever its state progresses or updates
   useEffect(() => {
@@ -353,6 +513,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const nextStatus = !worker.availability.isOnline;
     alertFeedbackService.playTouchFeedback('medium');
 
+    if (nextStatus) {
+      // Must verify location permission & GPS provider before going online
+      const hasPermission = await locationService.requestPermission();
+      if (!hasPermission) {
+        setGpsStatus('unavailable');
+        Alert.alert(
+          'Location Permission Required',
+          'Location permission is required to go online and receive customer service requests.'
+        );
+        return;
+      }
+
+      const hasGps = await locationService.isGpsProviderEnabled();
+      if (!hasGps) {
+        setGpsStatus('unavailable');
+        Alert.alert(
+          'GPS Disabled',
+          'Please turn on GPS / Location services on your device to receive nearby orders.'
+        );
+        return;
+      }
+
+      const loc = await locationService.getCurrentLocation();
+      if (loc) {
+        setLocationData(loc);
+        setWorkerLocation({ lat: loc.latitude, lng: loc.longitude });
+      }
+      setGpsStatus('online');
+    } else {
+      setGpsStatus('offline');
+      locationService.stopLiveTracking();
+    }
+
     // Optimistically update
     setWorker((prev) => ({
       ...prev,
@@ -376,8 +569,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       storageService.saveDutyStatus(updatedOnline);
 
       if (updatedOnline) {
-        workerApiService.sendLocationHeartbeat(workerLocation.lat, workerLocation.lng).catch(() => {});
+        setGpsStatus('online');
+        locationService.startLiveTracking((loc) => {
+          setLocationData(loc);
+          setWorkerLocation({ lat: loc.latitude, lng: loc.longitude });
+        }, 10000);
+
+        const targetId = apiClient.getUserId() || worker.userId || worker.id;
+        webSocketService.connect(targetId, worker.id);
         fetchJobRequests().catch(() => {});
+      } else {
+        setGpsStatus('offline');
+        locationService.stopLiveTracking();
       }
     } catch (err: any) {
       const errorMsg = err?.response?.data?.message || err?.message || 'Server rejected duty status update.';
@@ -391,11 +594,180 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           isOnline: !nextStatus,
         },
       }));
+      setGpsStatus(!nextStatus ? 'online' : 'offline');
       storageService.saveDutyStatus(!nextStatus);
 
       // Alert the worker clearly
       setActiveBannerAlert(`Duty Notice: ${errorMsg}`);
       alertFeedbackService.playTouchFeedback('heavy');
+    }
+  };
+
+  /**
+   * Fetch Weekly Availability and Time-Off from backend
+   */
+  const fetchAvailabilityData = async () => {
+    try {
+      const [schedule, timeOff] = await Promise.all([
+        workerApiService.getWeeklyAvailability(),
+        workerApiService.getTimeOff(),
+      ]);
+      if (Array.isArray(schedule) && schedule.length > 0) {
+        setWeeklySchedule(schedule);
+        const activeDays = schedule
+          .filter((d) => d.isAvailable)
+          .map((d) => d.dayName.substring(0, 3));
+        setWorker((prev) => ({
+          ...prev,
+          availability: {
+            ...prev.availability,
+            days: activeDays,
+            startHour: schedule[0]?.startTime || prev.availability.startHour,
+            endHour: schedule[0]?.endTime || prev.availability.endHour,
+          },
+        }));
+      }
+      if (Array.isArray(timeOff)) {
+        setTimeOffList(timeOff);
+      }
+    } catch (err) {
+      console.warn('[AppContext] fetchAvailabilityData notice:', err);
+    }
+  };
+
+  /**
+   * Save Weekly Availability schedule to backend: POST /workers/availability
+   */
+  const saveWeeklySchedule = async (schedule: DaySchedule[]): Promise<boolean> => {
+    try {
+      await workerApiService.saveWeeklyAvailability(schedule);
+      setWeeklySchedule(schedule);
+      const activeDays = schedule
+        .filter((d) => d.isAvailable)
+        .map((d) => d.dayName.substring(0, 3));
+      setWorker((prev) => ({
+        ...prev,
+        availability: {
+          ...prev.availability,
+          days: activeDays,
+          startHour: schedule[0]?.startTime || prev.availability.startHour,
+          endHour: schedule[0]?.endTime || prev.availability.endHour,
+        },
+      }));
+      setActiveBannerAlert('✅ Weekly availability schedule updated successfully!');
+      return true;
+    } catch (err: any) {
+      console.error('[AppContext] saveWeeklySchedule error:', err);
+      setActiveBannerAlert('❌ Failed to update weekly schedule.');
+      return false;
+    }
+  };
+
+  /**
+   * Add Blocked Date / Time-Off: POST /workers/time-off
+   */
+  const addWorkerTimeOff = async (
+    startDate: string,
+    endDate: string,
+    reason?: string
+  ): Promise<boolean> => {
+    try {
+      const created = await workerApiService.addTimeOff(startDate, endDate, reason);
+      if (created) {
+        setTimeOffList((prev) => [created, ...prev]);
+        setActiveBannerAlert(`📅 Dates blocked (${startDate} to ${endDate})`);
+        return true;
+      }
+      return false;
+    } catch (err: any) {
+      console.error('[AppContext] addWorkerTimeOff error:', err);
+      const msg = err?.response?.data?.message || 'Failed to block dates.';
+      setActiveBannerAlert(`❌ ${msg}`);
+      return false;
+    }
+  };
+
+  /**
+   * Delete Blocked Date / Time-Off: DELETE /workers/time-off/{id}
+   */
+  const deleteWorkerTimeOff = async (id: string): Promise<boolean> => {
+    try {
+      await workerApiService.deleteTimeOff(id);
+      setTimeOffList((prev) => prev.filter((item) => item.timeOffId !== id));
+      setActiveBannerAlert('Unblocked selected date range.');
+      return true;
+    } catch (err: any) {
+      console.error('[AppContext] deleteWorkerTimeOff error:', err);
+      return false;
+    }
+  };
+  const fetchAllScheduleSlots = async () => {
+    try {
+      const today = await workerApiService.getTodaySchedule();
+      const upcoming = await workerApiService.getUpcomingSchedule();
+
+      const slots: WorkerScheduleSlot[] = [];
+      if (Array.isArray(today?.schedule)) {
+        slots.push(...today.schedule);
+      }
+      if (Array.isArray(upcoming)) {
+        slots.push(...upcoming);
+      }
+
+      // Sort by scheduled time
+      slots.sort((a, b) => {
+        const timeA = a.scheduledAt || a.timeWindow || '';
+        const timeB = b.scheduledAt || b.timeWindow || '';
+        return timeA.localeCompare(timeB);
+      });
+
+      setAllScheduleSlots(slots);
+      setTodaySchedule(today);
+      setUpcomingSchedule(upcoming);
+    } catch (err) {
+      console.warn('[AppContext] fetchAllScheduleSlots error:', err);
+    }
+  };
+
+  const updateSlotStatus = async (bookingId: string, status: string) => {
+    try {
+      if (status === 'CANCELLED') {
+        await workerApiService.rejectBooking(bookingId);
+      } else {
+        await workerApiService.acceptBooking(bookingId);
+      }
+      await fetchAllScheduleSlots();
+      alertFeedbackService.playSuccessFeedback();
+      setActiveBannerAlert(`Booking ${status === 'CANCELLED' ? 'cancelled' : 'updated'} successfully`);
+    } catch (err: any) {
+      console.warn('[AppContext] updateSlotStatus error:', err);
+      alertFeedbackService.playTouchFeedback('heavy');
+    }
+  };
+
+  const setSlotAvailability = (bookingId: string, isAvailable: boolean) => {
+    setAllScheduleSlots((prev) =>
+      prev.map((slot) =>
+        slot.bookingId === bookingId
+          ? { ...slot, isAvailable, status: isAvailable ? 'SCHEDULED' : 'CANCELLED' }
+          : slot
+      )
+    );
+  };
+
+  /**
+   * Fetch Today's & Upcoming Work Schedule: GET /workers/schedule/today & upcoming
+   */
+  const fetchSchedules = async () => {
+    try {
+      const [today, upcoming] = await Promise.all([
+        workerApiService.getTodaySchedule(),
+        workerApiService.getUpcomingSchedule(),
+      ]);
+      if (today) setTodaySchedule(today);
+      if (Array.isArray(upcoming)) setUpcomingSchedule(upcoming);
+    } catch (err) {
+      console.warn('[AppContext] fetchSchedules notice:', err);
     }
   };
 
@@ -498,8 +870,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             : null
         );
       }
-    } catch (err) {
-      console.warn('[AppContext] acceptJob backend sync notice:', err);
+      fetchSchedules().catch(() => {});
+    } catch (err: any) {
+      console.warn('[AppContext] acceptJob backend sync error:', err);
+      const errorMsg =
+        err?.response?.data?.message || err?.message || 'Failed to accept booking.';
+      setActiveJob(null);
+      setJobRequests((prev) => [job, ...prev.filter((j) => j.id !== jobId && j.bookingId !== jobId)]);
+      setActiveBannerAlert(`⚠️ Booking Conflict: ${errorMsg}`);
+      alertFeedbackService.playTouchFeedback('heavy');
     }
   };
 
@@ -840,6 +1219,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toggleServiceSelection,
         updateAvailability,
         toggleOnlineStatus,
+        weeklySchedule,
+        timeOffList,
+        todaySchedule,
+        upcomingSchedule,
+        fetchAvailabilityData,
+        saveWeeklySchedule,
+        addWorkerTimeOff,
+        deleteWorkerTimeOff,
+        fetchSchedules,
+        allScheduleSlots,
+        fetchAllScheduleSlots,
+        updateSlotStatus,
+        setSlotAvailability,
         documents,
         uploadDocument,
         submitKycRegistration,
@@ -855,6 +1247,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         verifyJobPin,
         addSubServiceToJob,
         workerLocation,
+        locationData,
+        gpsStatus,
+        refreshLocation,
+        dashboardMetrics: {
+          todayJobs: (jobRequests.length > 0 ? jobRequests.length : 0) + completedJobs.length + (activeJob ? 1 : 0),
+          todayEarnings: earnings?.daily?.netPayout ?? 0,
+          completedJobs: worker.completedJobsCount || completedJobs.length,
+          pendingRequests: jobRequests.length,
+          activeJobs: activeJob ? 1 : 0,
+          averageRating: typeof worker.rating === 'number' ? worker.rating : 4.9,
+        },
         completeActiveJob,
         setActiveJobDirectly: setActiveJob,
         earnings,

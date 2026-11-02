@@ -4,7 +4,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { NotificationItem } from '../types';
 import { colors } from '../theme/colors';
 import { borderRadius, shadows, spacing } from '../theme/spacing';
-import { typography } from '../theme/typography';
 
 interface NotificationCardProps {
   notification: NotificationItem;
@@ -15,23 +14,21 @@ export const NotificationCard: React.FC<NotificationCardProps> = ({
   notification,
   onPress,
 }) => {
-  const getIconConfig = () => {
+  const getIconName = (): keyof typeof Ionicons.glyphMap => {
     switch (notification.type) {
       case 'job':
-        return { name: 'flash-outline' as const, bg: colors.primaryLighter, color: colors.primary };
+        return 'briefcase-outline';
       case 'payment':
-        return { name: 'wallet-outline' as const, bg: colors.successLight, color: colors.success };
+        return 'wallet-outline';
       case 'document':
-        return { name: 'shield-checkmark-outline' as const, bg: colors.infoLight, color: colors.info };
+        return 'shield-checkmark-outline';
       case 'offer':
-        return { name: 'gift-outline' as const, bg: colors.warningLight, color: colors.warning };
+        return 'gift-outline';
       case 'system':
       default:
-        return { name: 'notifications-outline' as const, bg: colors.surfaceAlt, color: colors.textSecondary };
+        return 'notifications-outline';
     }
   };
-
-  const iconConfig = getIconConfig();
 
   return (
     <TouchableOpacity
@@ -39,22 +36,27 @@ export const NotificationCard: React.FC<NotificationCardProps> = ({
       onPress={onPress}
       style={[styles.card, !notification.isRead && styles.unreadCard]}
     >
-      <View style={[styles.iconContainer, { backgroundColor: iconConfig.bg }]}>
-        <Ionicons name={iconConfig.name} size={22} color={iconConfig.color} />
+      <View style={styles.iconContainer}>
+        <Ionicons name={getIconName()} size={20} color={colors.primary} />
       </View>
 
       <View style={styles.contentColumn}>
         <View style={styles.topRow}>
-          <Text style={[styles.title, !notification.isRead && styles.unreadTitle]}>
+          <Text
+            style={[styles.title, !notification.isRead && styles.unreadTitle]}
+            numberOfLines={1}
+          >
             {notification.title}
           </Text>
           <Text style={styles.timestamp}>{notification.timestamp}</Text>
         </View>
 
-        <Text style={styles.body}>{notification.body}</Text>
+        <Text style={styles.body} numberOfLines={2}>
+          {notification.body}
+        </Text>
       </View>
 
-      {!notification.isRead && <View style={styles.unreadDot} />}
+      {!notification.isRead ? <View style={styles.unreadDot} /> : null}
     </TouchableOpacity>
   );
 };
@@ -63,22 +65,23 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: '#FFFFFF',
     borderRadius: borderRadius.lg,
     padding: spacing.md,
-    marginBottom: spacing.sm + 2,
+    marginBottom: spacing.sm,
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: colors.border,
     ...shadows.sm,
   },
   unreadCard: {
-    backgroundColor: colors.surface,
-    borderColor: colors.primarySoft,
+    borderColor: colors.primary,
+    backgroundColor: '#FFFFFF',
   },
   iconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
@@ -90,34 +93,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   title: {
-    ...typography.subtitle2,
+    fontSize: 14,
+    fontWeight: '600',
     color: colors.textPrimary,
     flex: 1,
     marginRight: spacing.xs,
   },
   unreadTitle: {
-    fontWeight: '800',
-    color: colors.primary,
+    fontWeight: '700',
+    color: colors.textPrimary,
   },
   timestamp: {
-    ...typography.caption,
-    color: colors.textMuted,
     fontSize: 11,
+    color: colors.textSecondary,
   },
   body: {
-    ...typography.body2,
+    fontSize: 12,
     color: colors.textSecondary,
-    lineHeight: 18,
+    lineHeight: 16,
   },
   unreadDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
     backgroundColor: colors.primary,
-    marginLeft: spacing.sm,
+    marginLeft: spacing.xs,
   },
 });
 

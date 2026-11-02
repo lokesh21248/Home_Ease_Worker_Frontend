@@ -1,49 +1,68 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   Switch,
+  TextInput,
+  Modal,
+  Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { borderRadius, shadows, spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-import Button from '../../components/Button';
-import Header from '../../components/Header';
+import { CustomHeader } from '../../components/CustomHeader';
+import { PremiumCard } from '../../components/PremiumCard';
+import { PrimaryButton } from '../../components/PrimaryButton';
+import { SecondaryButton } from '../../components/SecondaryButton';
 import { useApp } from '../../state/AppContext';
+import { DaySchedule } from '../../types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AvailabilitySetup'>;
 
 const ALL_DAYS = [
-  { short: 'Mon', full: 'Monday' },
-  { short: 'Tue', full: 'Tuesday' },
-  { short: 'Wed', full: 'Wednesday' },
-  { short: 'Thu', full: 'Thursday' },
-  { short: 'Fri', full: 'Friday' },
-  { short: 'Sat', full: 'Saturday' },
-  { short: 'Sun', full: 'Sunday' },
+  { short: 'Mon', full: 'Monday', dayOfWeek: 1 },
+  { short: 'Tue', full: 'Tuesday', dayOfWeek: 2 },
+  { short: 'Wed', full: 'Wednesday', dayOfWeek: 3 },
+  { short: 'Thu', full: 'Thursday', dayOfWeek: 4 },
+  { short: 'Fri', full: 'Friday', dayOfWeek: 5 },
+  { short: 'Sat', full: 'Saturday', dayOfWeek: 6 },
+  { short: 'Sun', full: 'Sunday', dayOfWeek: 7 },
 ];
 
-const TIME_SLOTS = [
-  '07:00 AM',
-  '08:00 AM',
-  '09:00 AM',
-  '10:00 AM',
-  '06:00 PM',
-  '07:00 PM',
-  '08:00 PM',
-  '09:00 PM',
-];
+function to24Hour(timeStr: string): string {
+  if (!timeStr) return '08:00';
+  if (/^\d{2}:\d{2}$/.test(timeStr)) return timeStr;
+  const parts = timeStr.trim().split(' ');
+  const [hh, mm] = parts[0].split(':');
+  let h = parseInt(hh, 10);
+  const modifier = parts[1]?.toUpperCase();
+  if (modifier === 'PM' && h < 12) h += 12;
+  if (modifier === 'AM' && h === 12) h = 0;
+  return `${h.toString().padStart(2, '0')}:${mm || '00'}`;
+}
 
 export const AvailabilitySetupScreen: React.FC<Props> = ({ navigation, route }) => {
   const isOnboarding = route.params?.isOnboarding ?? false;
-  const { worker, updateAvailability, submitKycRegistration, bankDetails } = useApp();
+  const {
+    worker,
+    updateAvailability,
+    submitKycRegistration,
+    bankDetails,
+    weeklySchedule,
+    timeOffList,
+    saveWeeklySchedule,
+    addWorkerTimeOff,
+    deleteWorkerTimeOff,
+    fetchAvailabilityData,
+    toggleOnlineStatus,
+  } = useApp();
 
   const [selectedDays, setSelectedDays] = useState<string[]>(
     worker.availability.days || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -54,12 +73,54 @@ export const AvailabilitySetupScreen: React.FC<Props> = ({ navigation, route }) 
   const [endHour, setEndHour] = useState<string>(
     worker.availability.endHour || '08:00 PM'
   );
+  const [breakStartHour, setBreakStartHour] = useState<string>('01:00 PM');
+  const [breakEndHour, setBreakEndHour] = useState<string>('02:00 PM');
+  const [hasBreak, setHasBreak] = useState<boolean>(true);
   const [isOnline, setIsOnline] = useState<boolean>(worker.availability.isOnline);
+
+  // Time off modal state
+  const [isTimeOffModalVisible, setIsTimeOffModalVisible] = useState(false);
+  const [timeOffStartDate, setTimeOffStartDate] = useState('');
+  const [timeOffEndDate, setTimeOffEndDate] = useState('');
+  const [timeOffReason, setTimeOffReason] = useState('Personal Leave');
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    fetchAvailabilityData();
+  }, []);
+
+  useEffect(() => {
+    if (weeklySchedule && weeklySchedule.length > 0) {
+      const activeDays = weeklySchedule
+        .filter((d) => d.isAvailable)
+        .map((d) => d.dayName.substring(0, 3));
+      if (activeDays.length > 0) setSelectedDays(activeDays);
+      const first = weeklySchedule[0];
+      if (first.startTime) setStartHour(formatTo12H(first.startTime));
+      if (first.endTime) setEndHour(formatTo12H(first.endTime));
+      if (first.breakStartTime && first.breakEndTime) {
+        setHasBreak(true);
+        setBreakStartHour(formatTo12H(first.breakStartTime));
+        setBreakEndHour(formatTo12H(first.breakEndTime));
+      }
+    }
+  }, [weeklySchedule]);
+
+  function formatTo12H(time24: string): string {
+    if (!time24) return '08:00 AM';
+    if (time24.includes('AM') || time24.includes('PM')) return time24;
+    const [hh, mm] = time24.split(':');
+    let h = parseInt(hh, 10);
+    const mod = h >= 12 ? 'PM' : 'AM';
+    if (h === 0) h = 12;
+    else if (h > 12) h -= 12;
+    return `${h.toString().padStart(2, '0')}:${mm || '00'} ${mod}`;
+  }
 
   const toggleDay = (dayShort: string) => {
     if (selectedDays.includes(dayShort)) {
       if (selectedDays.length === 1) {
-        alert('Please keep at least 1 working day active.');
+        Alert.alert('Working Schedule', 'Please keep at least 1 working day active.');
         return;
       }
       setSelectedDays(selectedDays.filter((d) => d !== dayShort));
@@ -68,69 +129,132 @@ export const AvailabilitySetupScreen: React.FC<Props> = ({ navigation, route }) 
     }
   };
 
-  const handleFinish = async () => {
-    updateAvailability({
-      days: selectedDays,
-      startHour,
-      endHour,
-      isOnline,
-    });
+  const handleAddTimeOff = async () => {
+    if (!timeOffStartDate || !timeOffEndDate) {
+      Alert.alert('Required Fields', 'Please enter both start and end date (YYYY-MM-DD).');
+      return;
+    }
+    const success = await addWorkerTimeOff(
+      timeOffStartDate.trim(),
+      timeOffEndDate.trim(),
+      timeOffReason.trim()
+    );
+    if (success) {
+      setIsTimeOffModalVisible(false);
+      setTimeOffStartDate('');
+      setTimeOffEndDate('');
+      setTimeOffReason('Personal Leave');
+    }
+  };
 
-    if (isOnboarding) {
-      // End-to-end Backend Register KYC & Skills: POST /workers/register-kyc
-      try {
-        const kycPayload = {
-          address: worker.address || 'Flat 204, Sai Residency, Hitec City, Hyderabad',
-          panNumber: worker.panNumber || 'ABCDE1234F',
-          panDocUrl:
-            worker.panDocUrl ||
-            'https://gheiuyygjssqatziviix.supabase.co/storage/v1/object/public/homeease-worker-kyc/pan-docs/6f2e1a3b_pan.png',
-          aadhaarDocUrl:
-            worker.aadhaarDocUrl ||
-            'https://gheiuyygjssqatziviix.supabase.co/storage/v1/object/public/homeease-worker-kyc/aadhaar-docs/6f2e1a3b_aadhaar.png',
-          bankAccountNo: bankDetails?.accountNumber || '50100234567891',
-          bankIfsc: bankDetails?.ifscCode || 'HDFC0001234',
-          subServiceIds:
-            worker.subServiceIds && worker.subServiceIds.length > 0
-              ? worker.subServiceIds
-              : [
-                  'c34b4032-95ed-4ed5-b5e9-a7f5ab8cd4f7',
-                  '63fa806f-d1f3-4f92-aa7f-527c86c899ce',
-                ],
-        };
-        await submitKycRegistration(kycPayload);
-      } catch (err: any) {
-        console.warn('[AvailabilitySetup] submitKyc notice:', err?.message);
+  const handleDeleteTimeOff = (id: string, dateRange: string) => {
+    Alert.alert(
+      'Unblock Dates',
+      `Are you sure you want to remove time off for ${dateRange}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Unblock',
+          style: 'destructive',
+          onPress: () => deleteWorkerTimeOff(id),
+        },
+      ]
+    );
+  };
+
+  const setQuickTimeOff = (daysAhead: number, durationDays: number) => {
+    const start = new Date();
+    start.setDate(start.getDate() + daysAhead);
+    const end = new Date(start);
+    end.setDate(end.getDate() + durationDays - 1);
+    setTimeOffStartDate(start.toISOString().split('T')[0]);
+    setTimeOffEndDate(end.toISOString().split('T')[0]);
+  };
+
+  const handleFinish = async () => {
+    setIsSaving(true);
+    try {
+      updateAvailability({
+        days: selectedDays,
+        startHour,
+        endHour,
+        isOnline,
+      });
+
+      if (isOnline !== worker.availability.isOnline) {
+        await toggleOnlineStatus();
       }
 
-      // Completed full onboarding sequence -> navigate into MainTabs!
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'MainTabs' }],
+      const schedulePayload: DaySchedule[] = ALL_DAYS.map((day) => {
+        const isAvailable = selectedDays.includes(day.short);
+        return {
+          dayOfWeek: day.dayOfWeek,
+          dayName: day.full,
+          isAvailable,
+          startTime: to24Hour(startHour),
+          endTime: to24Hour(endHour),
+          breakStartTime: hasBreak ? to24Hour(breakStartHour) : undefined,
+          breakEndTime: hasBreak ? to24Hour(breakEndHour) : undefined,
+          slotDurationMins: 60,
+        };
       });
-    } else {
-      navigation.goBack();
+
+      await saveWeeklySchedule(schedulePayload);
+
+      if (isOnboarding) {
+        try {
+          const kycPayload = {
+            address: worker.address || '',
+            panNumber: worker.panNumber || '',
+            panDocUrl: worker.panDocUrl || '',
+            aadhaarDocUrl: worker.aadhaarDocUrl || '',
+            bankAccountNo: bankDetails?.accountNumber || '',
+            bankIfsc: bankDetails?.ifscCode || '',
+            subServiceIds: worker.subServiceIds || [],
+          };
+          await submitKycRegistration(kycPayload);
+        } catch (err: any) {
+          console.warn('[AvailabilitySetup] submitKyc notice:', err?.message);
+        }
+
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'MainTabs' }],
+        });
+      } else {
+        navigation.goBack();
+      }
+    } catch (err: any) {
+      console.error('[AvailabilitySetup] save error:', err);
+      Alert.alert('Save Error', 'Could not save schedule to server. Check connection.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <CustomHeader
         title="Schedule & Availability"
-        subtitle={isOnboarding ? 'Step 5 of 5 • Final Setup' : 'Configure work hours'}
+        subtitle={isOnboarding ? 'Step 5 of 5 • Final Setup' : 'Configure work hours & breaks'}
         showBack
         onBack={() => navigation.goBack()}
       />
 
-      {isOnboarding && (
+      {isOnboarding ? (
         <View style={styles.progressBarContainer}>
           <View style={[styles.progressFill, { width: '100%' }]} />
         </View>
-      )}
+      ) : null}
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Online / Offline Status Toggle Banner */}
-        <View style={[styles.statusCard, isOnline ? styles.onlineCard : styles.offlineCard]}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Availability Online / Offline Card */}
+        <PremiumCard
+          style={[styles.statusCard, isOnline && styles.statusCardOnline]}
+        >
           <View style={styles.statusLeft}>
             <View
               style={[
@@ -138,33 +262,33 @@ export const AvailabilitySetupScreen: React.FC<Props> = ({ navigation, route }) 
                 { backgroundColor: isOnline ? colors.onlineGreen : colors.offlineGray },
               ]}
             />
-            <View>
+            <View style={{ flex: 1 }}>
               <Text style={styles.statusTitle}>
-                {isOnline ? "You are ONLINE" : "You are OFFLINE"}
+                {isOnline ? 'Online & Available' : 'Offline Mode'}
               </Text>
               <Text style={styles.statusDesc}>
                 {isOnline
-                  ? "Ready to receive instant nearby booking requests."
-                  : "Go online to start receiving customer jobs."}
+                  ? 'Accepting instant dispatches & bookings.'
+                  : 'Turn switch on to start receiving requests.'}
               </Text>
             </View>
           </View>
           <Switch
             value={isOnline}
             onValueChange={setIsOnline}
-            trackColor={{ false: colors.borderDark, true: colors.onlineGreen }}
-            thumbColor={colors.surface}
+            trackColor={{ false: colors.borderDark, true: colors.primary }}
+            thumbColor="#FFFFFF"
           />
-        </View>
+        </PremiumCard>
 
-        {/* Working Days */}
-        <View style={styles.card}>
+        {/* 1. Working Days */}
+        <PremiumCard style={styles.card}>
           <View style={styles.cardHeader}>
-            <Ionicons name="calendar-outline" size={20} color={colors.primary} />
-            <Text style={styles.cardTitle}>Working Days</Text>
+            <Ionicons name="calendar-outline" size={18} color={colors.primary} />
+            <Text style={styles.cardTitle}>Weekly Working Calendar</Text>
           </View>
           <Text style={styles.cardSub}>
-            Select the days of the week you are willing to accept jobs:
+            Select the days of the week you are available for work:
           </Text>
 
           <View style={styles.daysRow}>
@@ -187,33 +311,33 @@ export const AvailabilitySetupScreen: React.FC<Props> = ({ navigation, route }) 
           <Text style={styles.daysSelectedSummary}>
             {selectedDays.length} days active per week ({selectedDays.join(', ')})
           </Text>
-        </View>
+        </PremiumCard>
 
-        {/* Working Hours */}
-        <View style={styles.card}>
+        {/* 2. Working Hours */}
+        <PremiumCard style={styles.card}>
           <View style={styles.cardHeader}>
-            <Ionicons name="time-outline" size={20} color={colors.primary} />
-            <Text style={styles.cardTitle}>Working Hours (8 AM – 8 PM)</Text>
+            <Ionicons name="time-outline" size={18} color={colors.primary} />
+            <Text style={styles.cardTitle}>Daily Working Hours</Text>
           </View>
           <Text style={styles.cardSub}>
-            Set your preferred shift window for dispatching leads:
+            Customer bookings will only be scheduled inside this shift window:
           </Text>
 
           <View style={styles.timeRangeBox}>
             <View style={styles.timePickerCol}>
-              <Text style={styles.timePickerLabel}>Start Time</Text>
+              <Text style={styles.timePickerLabel}>Shift Start</Text>
               <View style={styles.timeSelectPill}>
-                <Ionicons name="sunny-outline" size={16} color={colors.warning} />
+                <Ionicons name="sunny-outline" size={16} color={colors.primary} />
                 <Text style={styles.timeSelectText}>{startHour}</Text>
               </View>
             </View>
 
             <View style={styles.timeArrow}>
-              <Ionicons name="arrow-forward" size={18} color={colors.textMuted} />
+              <Ionicons name="arrow-forward" size={16} color={colors.textSecondary} />
             </View>
 
             <View style={styles.timePickerCol}>
-              <Text style={styles.timePickerLabel}>End Time</Text>
+              <Text style={styles.timePickerLabel}>Shift End</Text>
               <View style={styles.timeSelectPill}>
                 <Ionicons name="moon-outline" size={16} color={colors.primary} />
                 <Text style={styles.timeSelectText}>{endHour}</Text>
@@ -221,12 +345,12 @@ export const AvailabilitySetupScreen: React.FC<Props> = ({ navigation, route }) 
             </View>
           </View>
 
-          {/* Quick Slot Buttons */}
+          {/* Quick Shift Presets */}
           <Text style={styles.quickSlotLabel}>Quick Shift Presets:</Text>
           <View style={styles.presetRow}>
             {[
               { label: 'Standard (8 AM - 8 PM)', start: '08:00 AM', end: '08:00 PM' },
-              { label: 'Morning Shift (7 AM - 3 PM)', start: '07:00 AM', end: '03:00 PM' },
+              { label: 'Morning (7 AM - 3 PM)', start: '07:00 AM', end: '03:00 PM' },
               { label: 'Full Day (9 AM - 9 PM)', start: '09:00 AM', end: '09:00 PM' },
             ].map((preset) => (
               <TouchableOpacity
@@ -252,16 +376,258 @@ export const AvailabilitySetupScreen: React.FC<Props> = ({ navigation, route }) 
               </TouchableOpacity>
             ))}
           </View>
-        </View>
+        </PremiumCard>
+
+        {/* 3. Daily Break Times */}
+        <PremiumCard style={styles.card}>
+          <View style={styles.headerBetween}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="cafe-outline" size={18} color={colors.primary} />
+              <Text style={styles.cardTitle}>Daily Break / Lunch Time</Text>
+            </View>
+            <Switch
+              value={hasBreak}
+              onValueChange={setHasBreak}
+              trackColor={{ false: colors.borderDark, true: colors.primary }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+          <Text style={styles.cardSub}>
+            Slots within your break time are automatically hidden from customer calendars.
+          </Text>
+
+          {hasBreak ? (
+            <>
+              <View style={styles.timeRangeBox}>
+                <View style={styles.timePickerCol}>
+                  <Text style={styles.timePickerLabel}>Break Start</Text>
+                  <View style={styles.timeSelectPill}>
+                    <Ionicons name="restaurant-outline" size={16} color={colors.primary} />
+                    <Text style={styles.timeSelectText}>{breakStartHour}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.timeArrow}>
+                  <Ionicons name="arrow-forward" size={16} color={colors.textSecondary} />
+                </View>
+
+                <View style={styles.timePickerCol}>
+                  <Text style={styles.timePickerLabel}>Break End</Text>
+                  <View style={styles.timeSelectPill}>
+                    <Ionicons name="time-outline" size={16} color={colors.primary} />
+                    <Text style={styles.timeSelectText}>{breakEndHour}</Text>
+                  </View>
+                </View>
+              </View>
+
+              <Text style={styles.quickSlotLabel}>Break Presets:</Text>
+              <View style={styles.presetRow}>
+                {[
+                  { label: 'Lunch: 1:00 PM – 2:00 PM', start: '01:00 PM', end: '02:00 PM' },
+                  { label: 'Late Lunch: 1:30 PM – 2:30 PM', start: '01:30 PM', end: '02:30 PM' },
+                  { label: 'Afternoon: 2:00 PM – 3:00 PM', start: '02:00 PM', end: '03:00 PM' },
+                ].map((preset) => (
+                  <TouchableOpacity
+                    key={preset.label}
+                    onPress={() => {
+                      setBreakStartHour(preset.start);
+                      setBreakEndHour(preset.end);
+                    }}
+                    style={[
+                      styles.presetChip,
+                      breakStartHour === preset.start &&
+                        breakEndHour === preset.end &&
+                        styles.presetChipActive,
+                    ]}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.presetText,
+                        breakStartHour === preset.start &&
+                          breakEndHour === preset.end &&
+                          styles.presetTextActive,
+                      ]}
+                    >
+                      {preset.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          ) : null}
+        </PremiumCard>
+
+        {/* 4. Block Specific Dates */}
+        <PremiumCard style={styles.card}>
+          <View style={styles.headerBetween}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="calendar-outline" size={18} color={colors.primary} />
+              <Text style={styles.cardTitle}>Block Specific Dates</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => {
+                setQuickTimeOff(1, 1);
+                setIsTimeOffModalVisible(true);
+              }}
+              style={styles.addTimeOffBtn}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="add" size={14} color="#FFFFFF" />
+              <Text style={styles.addTimeOffText}>Block Date</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.cardSub}>
+            Take planned leaves or vacations so no bookings are dispatched to you:
+          </Text>
+
+          {timeOffList && timeOffList.length > 0 ? (
+            timeOffList.map((item) => (
+              <View key={item.timeOffId} style={styles.timeOffItem}>
+                <View style={styles.timeOffLeft}>
+                  <View style={styles.timeOffIcon}>
+                    <Ionicons name="calendar-outline" size={16} color={colors.primary} />
+                  </View>
+                  <View>
+                    <Text style={styles.timeOffDates}>
+                      {item.startDate} {item.startDate !== item.endDate ? `to ${item.endDate}` : ''}
+                    </Text>
+                    <Text style={styles.timeOffReason}>
+                      {item.reason || 'Blocked leave / personal day'}
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  onPress={() =>
+                    handleDeleteTimeOff(
+                      item.timeOffId,
+                      `${item.startDate} to ${item.endDate}`
+                    )
+                  }
+                  style={styles.deleteTimeOffBtn}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="trash-outline" size={16} color={colors.danger} />
+                </TouchableOpacity>
+              </View>
+            ))
+          ) : (
+            <View style={styles.noTimeOffBox}>
+              <Ionicons name="checkmark-circle-outline" size={24} color={colors.primary} />
+              <Text style={styles.noTimeOffText}>
+                No upcoming leaves blocked. You are available on your active working days.
+              </Text>
+            </View>
+          )}
+        </PremiumCard>
       </ScrollView>
 
+      {/* Modal for adding blocked dates */}
+      <Modal
+        visible={isTimeOffModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsTimeOffModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Block Off Dates</Text>
+              <TouchableOpacity onPress={() => setIsTimeOffModalVisible(false)}>
+                <Ionicons name="close" size={22} color={colors.textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSub}>
+              Select dates to mark unavailable in customer search and reservations:
+            </Text>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Start Date (YYYY-MM-DD)</Text>
+              <TextInput
+                style={styles.textInput}
+                value={timeOffStartDate}
+                onChangeText={setTimeOffStartDate}
+                placeholder="2026-11-02"
+                placeholderTextColor={colors.textSecondary}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>End Date (YYYY-MM-DD)</Text>
+              <TextInput
+                style={styles.textInput}
+                value={timeOffEndDate}
+                onChangeText={setTimeOffEndDate}
+                placeholder="2026-11-03"
+                placeholderTextColor={colors.textSecondary}
+              />
+            </View>
+
+            <View style={styles.quickDateShortcuts}>
+              <TouchableOpacity
+                onPress={() => setQuickTimeOff(1, 1)}
+                style={styles.quickDatePill}
+              >
+                <Text style={styles.quickDateText}>Tomorrow</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setQuickTimeOff(1, 2)}
+                style={styles.quickDatePill}
+              >
+                <Text style={styles.quickDateText}>Next 2 Days</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setQuickTimeOff(3, 3)}
+                style={styles.quickDatePill}
+              >
+                <Text style={styles.quickDateText}>3-Day Weekend</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Reason (Optional)</Text>
+              <TextInput
+                style={styles.textInput}
+                value={timeOffReason}
+                onChangeText={setTimeOffReason}
+                placeholder="e.g. Personal vacation, Equipment maintenance"
+                placeholderTextColor={colors.textSecondary}
+              />
+            </View>
+
+            <View style={styles.modalActions}>
+              <SecondaryButton
+                title="Cancel"
+                size="md"
+                onPress={() => setIsTimeOffModalVisible(false)}
+                style={{ flex: 1 }}
+              />
+              <PrimaryButton
+                title="Confirm Block"
+                size="md"
+                onPress={handleAddTimeOff}
+                style={{ flex: 1 }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <View style={styles.footer}>
-        <Button
-          title={isOnboarding ? 'Complete Setup & Go to Dashboard 🚀' : 'Save Availability'}
-          variant="primary"
+        <PrimaryButton
+          title={
+            isSaving
+              ? 'Saving Schedule...'
+              : isOnboarding
+              ? 'Complete Setup & Open Dashboard'
+              : 'Save Availability & Hours'
+          }
           size="lg"
           fullWidth
           onPress={handleFinish}
+          disabled={isSaving}
+          loading={isSaving}
         />
       </View>
     </SafeAreaView>
@@ -274,34 +640,32 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   progressBarContainer: {
-    height: 4,
+    height: 3,
     backgroundColor: colors.border,
     width: '100%',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: colors.success,
+    backgroundColor: colors.primary,
   },
   scrollContent: {
-    padding: spacing.lg,
+    padding: spacing.md,
     paddingBottom: spacing.xxl,
   },
   statusCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: spacing.lg,
+    padding: spacing.md,
     borderRadius: borderRadius.lg,
-    marginBottom: spacing.lg,
-    borderWidth: 1.5,
+    marginBottom: spacing.md,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  onlineCard: {
-    backgroundColor: colors.successLight,
-    borderColor: colors.onlineGreen,
-  },
-  offlineCard: {
-    backgroundColor: colors.surfaceAlt,
-    borderColor: colors.borderDark,
+  statusCardOnline: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
   },
   statusLeft: {
     flexDirection: 'row',
@@ -310,58 +674,59 @@ const styles = StyleSheet.create({
     marginRight: spacing.md,
   },
   pulseIndicator: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    marginRight: spacing.md,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: spacing.sm,
   },
   statusTitle: {
-    ...typography.subtitle1,
-    fontWeight: '800',
+    fontSize: 14,
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   statusDesc: {
-    ...typography.caption,
+    fontSize: 11,
     color: colors.textSecondary,
     marginTop: 2,
-    lineHeight: 16,
+    lineHeight: 15,
   },
   card: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    marginBottom: spacing.lg,
-    ...shadows.sm,
+    marginBottom: spacing.md,
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: 4,
+  },
+  headerBetween: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 4,
   },
   cardTitle: {
-    ...typography.h3,
+    fontSize: 15,
+    fontWeight: '700',
     color: colors.textPrimary,
-    marginLeft: spacing.xs + 2,
   },
   cardSub: {
-    ...typography.body2,
+    fontSize: 12,
     color: colors.textSecondary,
-    marginBottom: spacing.lg,
-    lineHeight: 18,
+    marginBottom: spacing.md,
+    lineHeight: 16,
   },
   daysRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   dayCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1.5,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.background,
+    borderWidth: 1,
     borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
@@ -371,26 +736,30 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   dayText: {
-    ...typography.caption,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '600',
     color: colors.textSecondary,
   },
   dayTextSelected: {
-    color: colors.textInverse,
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
   daysSelectedSummary: {
-    ...typography.caption,
+    fontSize: 12,
     color: colors.primary,
     fontWeight: '600',
     textAlign: 'center',
+    marginTop: 4,
   },
   timeRangeBox: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: colors.background,
     padding: spacing.md,
     borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
     marginBottom: spacing.md,
   },
   timePickerCol: {
@@ -398,64 +767,200 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   timePickerLabel: {
-    ...typography.caption,
-    color: colors.textMuted,
+    fontSize: 11,
+    color: colors.textSecondary,
+    fontWeight: '600',
     marginBottom: 4,
   },
   timeSelectPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.border,
+    gap: 6,
   },
   timeSelectText: {
-    ...typography.subtitle2,
+    fontSize: 13,
+    fontWeight: '700',
     color: colors.textPrimary,
-    fontWeight: '800',
-    marginLeft: spacing.xs,
   },
   timeArrow: {
     paddingHorizontal: spacing.sm,
   },
   quickSlotLabel: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    fontWeight: '700',
-    marginBottom: spacing.xs,
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: 6,
   },
   presetRow: {
-    gap: spacing.xs + 2,
+    gap: 6,
   },
   presetChip: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: 8,
     borderRadius: borderRadius.md,
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.border,
   },
   presetChipActive: {
-    backgroundColor: colors.primaryLighter,
     borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
   },
   presetText: {
-    ...typography.caption,
+    fontSize: 12,
     color: colors.textSecondary,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   presetTextActive: {
     color: colors.primary,
+    fontWeight: '700',
+  },
+  addTimeOffBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: borderRadius.full,
+    gap: 4,
+  },
+  addTimeOffText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  timeOffItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.background,
+    padding: spacing.sm + 2,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.xs,
+  },
+  timeOffLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  timeOffIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+  },
+  timeOffDates: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  timeOffReason: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginTop: 1,
+  },
+  deleteTimeOffBtn: {
+    padding: 6,
+  },
+  noTimeOffBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primaryLight,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    gap: spacing.sm,
+  },
+  noTimeOffText: {
+    flex: 1,
+    fontSize: 12,
+    color: colors.primary,
+    lineHeight: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(23, 36, 58, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: borderRadius.xl,
+    borderTopRightRadius: borderRadius.xl,
+    padding: spacing.lg,
+    paddingBottom: spacing.xxl,
+    ...shadows.md,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  modalTitle: {
+    fontSize: 18,
     fontWeight: '800',
+    color: colors.textPrimary,
+  },
+  modalSub: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
+  },
+  inputGroup: {
+    marginBottom: spacing.sm,
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: 4,
+  },
+  textInput: {
+    height: 44,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    fontSize: 13,
+    color: colors.textPrimary,
+  },
+  quickDateShortcuts: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  quickDatePill: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.primaryLight,
+  },
+  quickDateText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.md,
   },
   footer: {
-    padding: spacing.lg,
-    backgroundColor: colors.surface,
+    padding: spacing.md,
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
+    borderTopColor: colors.border,
   },
 });
 

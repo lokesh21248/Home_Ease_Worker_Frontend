@@ -3,21 +3,20 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   FlatList,
   TouchableOpacity,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../../navigation/types';
 import { NotificationItem } from '../../types';
 import { colors } from '../../theme/colors';
-import { borderRadius, spacing } from '../../theme/spacing';
-import { typography } from '../../theme/typography';
-import Header from '../../components/Header';
-import NotificationCard from '../../components/NotificationCard';
-import EmptyState from '../../components/EmptyState';
+import { borderRadius, shadows, spacing } from '../../theme/spacing';
+import { CustomHeader } from '../../components/CustomHeader';
+import { NotificationCard } from '../../components/NotificationCard';
+import { EmptyState } from '../../components/EmptyState';
 import { useApp } from '../../state/AppContext';
 
 export const NotificationsScreen: React.FC = () => {
@@ -53,18 +52,23 @@ export const NotificationsScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Top Header */}
+      <CustomHeader
         title="Notifications"
         subtitle={
           unreadNotificationsCount > 0
             ? `${unreadNotificationsCount} unread alerts`
-            : 'All caught up'
+            : 'All alerts caught up'
         }
         showBack
         rightAction={
           unreadNotificationsCount > 0 ? (
-            <TouchableOpacity onPress={markAllNotificationsAsRead} activeOpacity={0.7}>
+            <TouchableOpacity
+              onPress={markAllNotificationsAsRead}
+              activeOpacity={0.7}
+              style={styles.markAllBtn}
+            >
               <Text style={styles.markAllText}>Mark all read</Text>
             </TouchableOpacity>
           ) : undefined
@@ -75,26 +79,24 @@ export const NotificationsScreen: React.FC = () => {
       <View style={styles.filterRow}>
         {[
           { key: 'All', label: 'All' },
-          { key: 'job', label: 'Jobs ⚡' },
-          { key: 'payment', label: 'Payments 💰' },
-          { key: 'offer', label: 'Offers 🎁' },
-        ].map((tab) => (
-          <TouchableOpacity
-            key={tab.key}
-            onPress={() => setActiveFilter(tab.key as any)}
-            style={[styles.filterChip, activeFilter === tab.key && styles.filterChipActive]}
-            activeOpacity={0.7}
-          >
-            <Text
-              style={[
-                styles.filterText,
-                activeFilter === tab.key && styles.filterTextActive,
-              ]}
+          { key: 'job', label: 'Jobs' },
+          { key: 'payment', label: 'Payouts' },
+          { key: 'offer', label: 'Incentives' },
+        ].map((tab) => {
+          const isActive = activeFilter === tab.key;
+          return (
+            <TouchableOpacity
+              key={tab.key}
+              onPress={() => setActiveFilter(tab.key as any)}
+              style={[styles.filterChip, isActive && styles.filterChipActive]}
+              activeOpacity={0.75}
             >
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+              <Text style={[styles.filterText, isActive && styles.filterTextActive]}>
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       <FlatList
@@ -110,7 +112,7 @@ export const NotificationsScreen: React.FC = () => {
         )}
         ListEmptyComponent={
           <EmptyState
-            iconName="notifications-off-outline"
+            icon="notifications-off-outline"
             title="No Notifications"
             description="You don't have any notifications in this category yet."
           />
@@ -125,25 +127,29 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  markAllBtn: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+  },
   markAllText: {
-    ...typography.caption,
+    fontSize: 12,
     color: colors.primary,
     fontWeight: '700',
   },
   filterRow: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: '#FFFFFF',
     gap: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
+    borderBottomColor: colors.border,
   },
   filterChip: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 2,
+    paddingVertical: 6,
     borderRadius: borderRadius.full,
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -152,15 +158,16 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   filterText: {
-    ...typography.caption,
+    fontSize: 12,
     color: colors.textSecondary,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   filterTextActive: {
-    color: colors.textInverse,
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
   listContent: {
-    padding: spacing.lg,
+    padding: spacing.md,
     paddingBottom: spacing.xxl,
   },
 });

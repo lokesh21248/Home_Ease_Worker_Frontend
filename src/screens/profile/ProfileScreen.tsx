@@ -3,12 +3,12 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   Image,
   TouchableOpacity,
   Modal,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,9 +16,10 @@ import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { borderRadius, shadows, spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-import Header from '../../components/Header';
-import Button from '../../components/Button';
-import Badge from '../../components/Badge';
+import { CustomHeader } from '../../components/CustomHeader';
+import { PremiumCard } from '../../components/PremiumCard';
+import { PrimaryButton } from '../../components/PrimaryButton';
+import { SecondaryButton } from '../../components/SecondaryButton';
 import { useApp } from '../../state/AppContext';
 
 export const ProfileScreen: React.FC = () => {
@@ -27,12 +28,13 @@ export const ProfileScreen: React.FC = () => {
 
   const [isLogoutModalVisible, setIsLogoutModalVisible] = useState(false);
 
-  // Fetch live worker profile from backend GET /workers/profile
   React.useEffect(() => {
-    fetchWorkerProfile().catch(() => {});
+    fetchWorkerProfile().catch((err: any) => {
+      const status: number | undefined = err?.status ?? err?.response?.status;
+      console.warn('[ProfileScreen] fetchWorkerProfile failed:', status, err?.message);
+    });
   }, []);
 
-  // Match worker's selected services
   const activeServiceNames = services
     .filter((s) => worker.selectedServices.includes(s.id))
     .map((s) => s.name);
@@ -52,80 +54,90 @@ export const ProfileScreen: React.FC = () => {
     {
       id: 'bank',
       title: 'Bank Details & Payouts',
-      subtitle: 'Manage linked bank accounts for direct withdrawals',
-      icon: 'business-outline',
-      color: colors.primary,
+      subtitle: 'Manage linked accounts for instant withdrawals',
+      icon: 'business-outline' as const,
       onPress: () => navigation.navigate('BankDetails'),
     },
     {
       id: 'docs',
-      title: 'Documents & Verification',
-      subtitle: `${approvedDocsCount}/${documents.length} verified • Aadhaar, PAN, Licenses`,
-      icon: 'shield-checkmark-outline',
-      color: colors.success,
+      title: 'Documents & KYC Verification',
+      subtitle: `${approvedDocsCount}/${documents.length} verified • Aadhaar, PAN`,
+      icon: 'shield-checkmark-outline' as const,
       onPress: () => navigation.navigate('DocumentUpload', { isOnboarding: false }),
     },
     {
       id: 'services',
       title: 'Service Categories & Skills',
       subtitle: `${worker.selectedServices.length} active service trades`,
-      icon: 'construct-outline',
-      color: colors.info,
+      icon: 'construct-outline' as const,
       onPress: () => navigation.navigate('ServiceSelection', { isOnboarding: false }),
     },
     {
       id: 'availability',
       title: 'Schedule & Availability',
       subtitle: `${worker.availability.days.length} working days • ${worker.availability.startHour} - ${worker.availability.endHour}`,
-      icon: 'calendar-outline',
-      color: colors.primary,
+      icon: 'calendar-outline' as const,
       onPress: () => navigation.navigate('AvailabilitySetup', { isOnboarding: false }),
     },
     {
       id: 'reviews',
       title: 'Customer Reviews & Ratings',
       subtitle: `${worker.rating} ★ (${worker.totalReviews} verified reviews)`,
-      icon: 'star-outline',
-      color: colors.accent,
+      icon: 'star-outline' as const,
       onPress: () => navigation.navigate('ReviewsRatings'),
     },
     {
       id: 'support',
       title: 'Help & Partner Support',
       subtitle: 'FAQs, live chat, partner safety & call center',
-      icon: 'headset-outline',
-      color: colors.secondary,
+      icon: 'headset-outline' as const,
       onPress: () => navigation.navigate('Support'),
     },
     {
       id: 'settings',
-      title: 'App Settings & Language',
-      subtitle: 'Dark mode, push alerts, app language & terms',
-      icon: 'settings-outline',
-      color: colors.textSecondary,
+      title: 'App Settings & Notifications',
+      subtitle: 'Push alerts, language & terms',
+      icon: 'settings-outline' as const,
       onPress: () => navigation.navigate('Settings'),
     },
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header title="Partner Profile" subtitle="Account & Trade Management" />
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Top Header */}
+      <CustomHeader
+        title="Partner Profile"
+        subtitle="Account & Trade Management"
+      />
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Worker Profile Card */}
-        <View style={styles.profileHeaderCard}>
+        <PremiumCard style={styles.card}>
           <View style={styles.avatarRow}>
             <View style={styles.avatarWrapper}>
-              <Image source={{ uri: worker.photoUri }} style={styles.avatar} />
+              <Image
+                source={{
+                  uri:
+                    worker.photoUri ||
+                    'https://images.unsplash.com/photo-1540569014015-19a7be504e3a?w=400',
+                }}
+                style={styles.avatar}
+              />
               <View style={styles.verifiedCheckBadge}>
-                <Ionicons name="checkmark" size={14} color={colors.textInverse} />
+                <Ionicons name="checkmark" size={12} color="#FFFFFF" />
               </View>
             </View>
 
             <View style={styles.profileMeta}>
               <View style={styles.nameRow}>
-                <Text style={styles.workerName}>{worker.name}</Text>
-                <Badge label="Verified Pro" variant="success" size="sm" />
+                <Text style={styles.workerName}>{worker.name || 'Service Partner'}</Text>
+                <View style={styles.verifiedTag}>
+                  <Ionicons name="checkmark-circle" size={11} color="#FFFFFF" />
+                  <Text style={styles.verifiedTagText}>VERIFIED</Text>
+                </View>
               </View>
               <Text style={styles.workerPhone}>
                 {worker.countryCode} {worker.phone}
@@ -137,9 +149,11 @@ export const ProfileScreen: React.FC = () => {
           </View>
 
           {/* Bio Box */}
-          <View style={styles.bioBox}>
-            <Text style={styles.bioText}>{worker.bio}</Text>
-          </View>
+          {worker.bio ? (
+            <View style={styles.bioBox}>
+              <Text style={styles.bioText}>{worker.bio}</Text>
+            </View>
+          ) : null}
 
           {/* Quick Metrics Bar */}
           <View style={styles.statsBar}>
@@ -149,7 +163,7 @@ export const ProfileScreen: React.FC = () => {
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statCol}>
-              <Text style={[styles.statVal, { color: colors.accent }]}>
+              <Text style={styles.statValRating}>
                 {worker.rating} ★
               </Text>
               <Text style={styles.statLbl}>Rating</Text>
@@ -160,23 +174,23 @@ export const ProfileScreen: React.FC = () => {
               <Text style={styles.statLbl}>Languages</Text>
             </View>
           </View>
-        </View>
+        </PremiumCard>
 
         {/* Selected Services Tags */}
-        <View style={styles.card}>
+        <PremiumCard style={styles.card}>
           <Text style={styles.sectionTitle}>Active Service Trades</Text>
           <View style={styles.serviceChipsRow}>
             {activeServiceNames.map((s, idx) => (
               <View key={idx} style={styles.serviceChip}>
-                <Ionicons name="checkmark-circle" size={14} color={colors.primary} />
+                <Ionicons name="checkmark-circle-outline" size={14} color={colors.primary} />
                 <Text style={styles.serviceChipText}>{s}</Text>
               </View>
             ))}
           </View>
-        </View>
+        </PremiumCard>
 
         {/* Menu Navigation List */}
-        <View style={styles.card}>
+        <PremiumCard style={styles.card}>
           <Text style={styles.sectionTitle}>Account Menu</Text>
 
           {menuItems.map((item, index) => (
@@ -189,8 +203,8 @@ export const ProfileScreen: React.FC = () => {
               onPress={item.onPress}
               activeOpacity={0.7}
             >
-              <View style={[styles.menuIconCircle, { backgroundColor: item.color + '15' }]}>
-                <Ionicons name={item.icon as any} size={20} color={item.color} />
+              <View style={styles.menuIconCircle}>
+                <Ionicons name={item.icon} size={20} color={colors.primary} />
               </View>
 
               <View style={styles.menuTextCol}>
@@ -198,10 +212,10 @@ export const ProfileScreen: React.FC = () => {
                 <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
               </View>
 
-              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+              <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
             </TouchableOpacity>
           ))}
-        </View>
+        </PremiumCard>
 
         {/* Logout Button */}
         <TouchableOpacity
@@ -209,41 +223,38 @@ export const ProfileScreen: React.FC = () => {
           onPress={() => setIsLogoutModalVisible(true)}
           activeOpacity={0.8}
         >
-          <Ionicons name="log-out-outline" size={20} color={colors.danger} />
+          <Ionicons name="log-out-outline" size={18} color={colors.danger} />
           <Text style={styles.logoutText}>Log Out from Partner Account</Text>
         </TouchableOpacity>
 
-        <Text style={styles.versionText}>HomeEase Worker v1.0.0 (Build 540)</Text>
+        <Text style={styles.versionText}>HomeEase Partner v2.4.0 (Build 540)</Text>
       </ScrollView>
 
-      {/* Logout Confirmation Dialog Modal (Screen 23) */}
+      {/* Logout Confirmation Dialog Modal */}
       <Modal visible={isLogoutModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.logoutDialogCard}>
             <View style={styles.logoutIconCircle}>
-              <Ionicons name="log-out" size={32} color={colors.danger} />
+              <Ionicons name="log-out-outline" size={30} color={colors.danger} />
             </View>
 
             <Text style={styles.dialogTitle}>Log Out Confirmation</Text>
             <Text style={styles.dialogBody}>
-              Are you sure you want to log out of HomeEase Worker? You will stop receiving job alerts
-              while signed out.
+              Are you sure you want to log out? You will stop receiving job alerts while signed out.
             </Text>
 
             <View style={styles.dialogButtonsRow}>
-              <Button
+              <SecondaryButton
                 title="Cancel"
-                variant="outline"
                 size="md"
                 onPress={() => setIsLogoutModalVisible(false)}
-                style={styles.dialogCancelBtn}
+                style={styles.dialogBtn}
               />
-              <Button
+              <PrimaryButton
                 title="Yes, Log Out"
-                variant="danger"
                 size="md"
                 onPress={handleLogoutConfirm}
-                style={styles.dialogConfirmBtn}
+                style={[styles.dialogBtn, { backgroundColor: colors.danger }]}
               />
             </View>
           </View>
@@ -259,17 +270,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   scrollContent: {
-    padding: spacing.lg,
+    padding: spacing.md,
     paddingBottom: spacing.xxl,
   },
-  profileHeaderCard: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
+  card: {
     marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    ...shadows.sm,
   },
   avatarRow: {
     flexDirection: 'row',
@@ -279,9 +284,10 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   avatar: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: colors.primaryLight,
     borderWidth: 2,
     borderColor: colors.primary,
   },
@@ -296,7 +302,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: colors.surface,
+    borderColor: '#FFFFFF',
   },
   profileMeta: {
     flex: 1,
@@ -308,35 +314,53 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   workerName: {
-    ...typography.h3,
+    fontSize: 17,
+    fontWeight: '800',
     color: colors.textPrimary,
   },
+  verifiedTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    gap: 3,
+  },
+  verifiedTagText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+  },
   workerPhone: {
-    ...typography.caption,
+    fontSize: 13,
     color: colors.primary,
     fontWeight: '700',
     marginTop: 2,
   },
   workerExp: {
-    ...typography.caption,
+    fontSize: 12,
     color: colors.textSecondary,
     marginTop: 2,
   },
   bioBox: {
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: colors.background,
     padding: spacing.md,
     borderRadius: borderRadius.md,
     marginTop: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   bioText: {
-    ...typography.body2,
+    fontSize: 12,
     color: colors.textSecondary,
     lineHeight: 18,
   },
   statsBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    backgroundColor: colors.primaryLighter,
+    backgroundColor: colors.primaryLight,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     marginTop: spacing.md,
@@ -346,34 +370,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statVal: {
-    ...typography.subtitle1,
-    color: colors.textPrimary,
+    fontSize: 16,
     fontWeight: '800',
+    color: colors.textPrimary,
+  },
+  statValRating: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: colors.primary,
   },
   statLbl: {
-    ...typography.caption,
-    color: colors.textSecondary,
     fontSize: 11,
-    marginTop: 1,
+    color: colors.textSecondary,
+    marginTop: 2,
+    fontWeight: '500',
   },
   statDivider: {
     width: 1,
     height: 24,
-    backgroundColor: colors.primarySoft,
-  },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    ...shadows.sm,
+    backgroundColor: colors.border,
   },
   sectionTitle: {
-    ...typography.subtitle1,
-    color: colors.textPrimary,
+    fontSize: 15,
     fontWeight: '700',
+    color: colors.textPrimary,
     marginBottom: spacing.md,
   },
   serviceChipsRow: {
@@ -384,16 +404,16 @@ const styles = StyleSheet.create({
   serviceChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: colors.primaryLight,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs + 2,
     borderRadius: borderRadius.full,
-    gap: 4,
+    gap: 6,
     borderWidth: 1,
     borderColor: colors.border,
   },
   serviceChipText: {
-    ...typography.caption,
+    fontSize: 12,
     color: colors.textPrimary,
     fontWeight: '600',
   },
@@ -402,12 +422,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
+    borderBottomColor: colors.border,
   },
   menuIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -417,73 +438,74 @@ const styles = StyleSheet.create({
     marginRight: spacing.sm,
   },
   menuTitle: {
-    ...typography.subtitle2,
+    fontSize: 14,
+    fontWeight: '600',
     color: colors.textPrimary,
   },
   menuSubtitle: {
-    ...typography.caption,
-    color: colors.textSecondary,
     fontSize: 11,
-    marginTop: 1,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.dangerLight,
-    paddingVertical: spacing.md + 2,
-    borderRadius: borderRadius.lg,
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 14,
+    borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: '#FECACA',
     marginVertical: spacing.md,
     gap: spacing.xs,
   },
   logoutText: {
-    ...typography.subtitle2,
+    fontSize: 13,
     color: colors.danger,
     fontWeight: '700',
   },
   versionText: {
-    ...typography.caption,
-    color: colors.textMuted,
+    fontSize: 11,
+    color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: spacing.lg,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: colors.overlay,
+    backgroundColor: 'rgba(23, 36, 58, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.xl,
   },
   logoutDialogCard: {
-    backgroundColor: colors.surface,
+    backgroundColor: '#FFFFFF',
     borderRadius: borderRadius.xl,
     padding: spacing.xl,
     alignItems: 'center',
     width: '100%',
-    ...shadows.lg,
+    ...shadows.md,
   },
   logoutIconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.dangerLight,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#FEE2E2',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
   },
   dialogTitle: {
-    ...typography.h2,
+    fontSize: 18,
+    fontWeight: '800',
     color: colors.textPrimary,
     textAlign: 'center',
   },
   dialogBody: {
-    ...typography.body2,
+    fontSize: 13,
     color: colors.textSecondary,
     textAlign: 'center',
     marginTop: spacing.xs,
-    lineHeight: 20,
+    lineHeight: 18,
   },
   dialogButtonsRow: {
     flexDirection: 'row',
@@ -491,10 +513,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
     width: '100%',
   },
-  dialogCancelBtn: {
-    flex: 1,
-  },
-  dialogConfirmBtn: {
+  dialogBtn: {
     flex: 1,
   },
 });

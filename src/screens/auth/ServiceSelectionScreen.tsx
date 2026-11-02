@@ -3,18 +3,19 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { borderRadius, shadows, spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-import Button from '../../components/Button';
-import Header from '../../components/Header';
+import { CustomHeader } from '../../components/CustomHeader';
+import { PrimaryButton } from '../../components/PrimaryButton';
 import { useApp } from '../../state/AppContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ServiceSelection'>;
@@ -25,11 +26,10 @@ export const ServiceSelectionScreen: React.FC<Props> = ({ navigation, route }) =
 
   const handleContinue = () => {
     if (worker.selectedServices.length === 0) {
-      alert('Please choose at least one service category to receive jobs.');
+      Alert.alert('Selection Required', 'Please choose at least one service category to receive jobs.');
       return;
     }
 
-    // Gather all matching sub-service UUIDs for backend KYC registration
     const allSelectedSubServiceIds: string[] = [];
     services.forEach((s) => {
       if (worker.selectedServices.includes(s.id) && s.subServices) {
@@ -52,8 +52,8 @@ export const ServiceSelectionScreen: React.FC<Props> = ({ navigation, route }) =
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <CustomHeader
         title="Select Services"
         subtitle={
           isOnboarding
@@ -64,28 +64,33 @@ export const ServiceSelectionScreen: React.FC<Props> = ({ navigation, route }) =
         onBack={() => navigation.goBack()}
       />
 
-      {isOnboarding && (
+      {isOnboarding ? (
         <View style={styles.progressBarContainer}>
           <View style={[styles.progressFill, { width: '80%' }]} />
         </View>
-      )}
+      ) : null}
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.headerNotice}>
-          <Ionicons name="sparkles" size={20} color={colors.accent} />
+          <Ionicons name="sparkles-outline" size={18} color={colors.primary} />
           <Text style={styles.headerNoticeText}>
-            Select all skills you are certified to perform. You can add or remove trades anytime.
+            Select all skills you are certified to perform. You can add or update trades anytime.
           </Text>
         </View>
 
         <View style={styles.counterRow}>
           <Text style={styles.counterLabel}>Available Service Categories</Text>
-          <Text style={styles.counterBadge}>
-            {worker.selectedServices.length} Selected
-          </Text>
+          <View style={styles.counterBadge}>
+            <Text style={styles.counterBadgeText}>
+              {worker.selectedServices.length} Selected
+            </Text>
+          </View>
         </View>
 
-        {/* 2-Column Grid or List of Services */}
+        {/* 2-Column Grid */}
         <View style={styles.grid}>
           {services.map((service) => {
             const isSelected = worker.selectedServices.includes(service.id);
@@ -105,9 +110,9 @@ export const ServiceSelectionScreen: React.FC<Props> = ({ navigation, route }) =
                     ]}
                   >
                     <Ionicons
-                      name={service.icon as any}
-                      size={24}
-                      color={isSelected ? colors.textInverse : colors.primary}
+                      name={(service.icon as any) || 'construct-outline'}
+                      size={22}
+                      color={isSelected ? '#FFFFFF' : colors.primary}
                     />
                   </View>
 
@@ -117,13 +122,16 @@ export const ServiceSelectionScreen: React.FC<Props> = ({ navigation, route }) =
                       isSelected && styles.checkboxCircleSelected,
                     ]}
                   >
-                    {isSelected && (
-                      <Ionicons name="checkmark" size={14} color={colors.textInverse} />
-                    )}
+                    {isSelected ? (
+                      <Ionicons name="checkmark" size={12} color="#FFFFFF" />
+                    ) : null}
                   </View>
                 </View>
 
-                <Text style={[styles.serviceName, isSelected && styles.serviceNameSelected]}>
+                <Text
+                  style={[styles.serviceName, isSelected && styles.serviceNameSelected]}
+                  numberOfLines={1}
+                >
                   {service.name}
                 </Text>
                 <Text style={styles.serviceDesc} numberOfLines={2}>
@@ -142,14 +150,12 @@ export const ServiceSelectionScreen: React.FC<Props> = ({ navigation, route }) =
       </ScrollView>
 
       <View style={styles.footer}>
-        <Button
+        <PrimaryButton
           title={isOnboarding ? 'Continue to Availability' : 'Save Changes'}
-          variant="primary"
           size="lg"
           fullWidth
           onPress={handleContinue}
-          icon={<Ionicons name="arrow-forward" size={18} color={colors.textInverse} />}
-          iconPosition="right"
+          iconRight={<Ionicons name="arrow-forward-outline" size={18} color="#FFFFFF" />}
         />
       </View>
     </SafeAreaView>
@@ -162,7 +168,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   progressBarContainer: {
-    height: 4,
+    height: 3,
     backgroundColor: colors.border,
     width: '100%',
   },
@@ -171,65 +177,63 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   scrollContent: {
-    padding: spacing.lg,
+    padding: spacing.md,
     paddingBottom: spacing.xxl,
   },
   headerNotice: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.warningLight,
+    backgroundColor: colors.primaryLight,
     padding: spacing.md,
     borderRadius: borderRadius.md,
-    marginBottom: spacing.lg,
-    borderWidth: 1,
-    borderColor: '#FDE68A',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
   },
   headerNoticeText: {
-    ...typography.caption,
-    color: '#92400E',
-    fontWeight: '600',
-    marginLeft: spacing.sm,
     flex: 1,
+    fontSize: 12,
+    color: colors.primary,
     lineHeight: 16,
   },
   counterRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: spacing.md,
   },
   counterLabel: {
-    ...typography.subtitle1,
+    fontSize: 14,
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   counterBadge: {
-    ...typography.caption,
-    backgroundColor: colors.primaryLighter,
-    color: colors.primary,
-    fontWeight: '800',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: borderRadius.full,
+  },
+  counterBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.primary,
   },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.md,
-    justifyContent: 'space-between',
+    gap: spacing.sm,
   },
   serviceCard: {
     width: '48%',
-    backgroundColor: colors.surface,
+    backgroundColor: '#FFFFFF',
     borderRadius: borderRadius.lg,
     padding: spacing.md,
-    borderWidth: 1.5,
-    borderColor: colors.borderLight,
-    marginBottom: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.border,
     ...shadows.sm,
   },
   serviceCardSelected: {
     borderColor: colors.primary,
-    backgroundColor: colors.primaryLighter,
+    backgroundColor: colors.primaryLight,
   },
   topCardRow: {
     flexDirection: 'row',
@@ -238,10 +242,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   iconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.surfaceAlt,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -249,63 +253,56 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   checkboxCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: colors.borderDark,
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surface,
   },
   checkboxCircleSelected: {
     borderColor: colors.primary,
     backgroundColor: colors.primary,
   },
   serviceName: {
-    ...typography.subtitle2,
+    fontSize: 14,
+    fontWeight: '700',
     color: colors.textPrimary,
     marginBottom: 2,
   },
   serviceNameSelected: {
     color: colors.primary,
-    fontWeight: '700',
   },
   serviceDesc: {
-    ...typography.caption,
-    color: colors.textSecondary,
     fontSize: 11,
-    lineHeight: 14,
-    height: 28,
+    color: colors.textSecondary,
+    lineHeight: 15,
+    height: 30,
   },
   priceRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    marginTop: spacing.sm,
-    paddingTop: spacing.xs,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
+    marginTop: spacing.xs,
   },
   startingFrom: {
-    ...typography.caption,
-    color: colors.textMuted,
     fontSize: 10,
+    color: colors.textSecondary,
   },
   priceText: {
-    ...typography.subtitle2,
-    color: colors.success,
-    fontWeight: '800',
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primary,
   },
   perJob: {
-    ...typography.caption,
-    color: colors.textMuted,
     fontSize: 10,
+    color: colors.textSecondary,
   },
   footer: {
-    padding: spacing.lg,
-    backgroundColor: colors.surface,
+    padding: spacing.md,
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
+    borderTopColor: colors.border,
   },
 });
 

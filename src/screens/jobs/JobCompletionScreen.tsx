@@ -3,22 +3,24 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   Image,
   TouchableOpacity,
   Alert,
   Modal,
+  TextInput,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { borderRadius, shadows, spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-import Header from '../../components/Header';
-import Button from '../../components/Button';
-import Input from '../../components/Input';
+import { CustomHeader } from '../../components/CustomHeader';
+import { PremiumCard } from '../../components/PremiumCard';
+import { PrimaryButton } from '../../components/PrimaryButton';
+import { SecondaryButton } from '../../components/SecondaryButton';
 import { useApp } from '../../state/AppContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'JobCompletion'>;
@@ -27,17 +29,12 @@ export const JobCompletionScreen: React.FC<Props> = ({ navigation, route }) => {
   const { job } = route.params;
   const { completeActiveJob } = useApp();
 
-  const [beforeImage, setBeforeImage] = useState<string | null>(
-    'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=400&q=80'
-  );
-  const [afterImage, setAfterImage] = useState<string | null>(
-    'https://images.unsplash.com/photo-1584622781564-1d987f7333c1?w=400&q=80'
-  );
-  const [hasSignature, setHasSignature] = useState<boolean>(true);
-  const [workNotes, setWorkNotes] = useState<string>(
-    'Service completed thoroughly. Fixed loose pipe joint and wiped down kitchen tiles.'
-  );
+  const [beforeImage, setBeforeImage] = useState<string | null>(null);
+  const [afterImage, setAfterImage] = useState<string | null>(null);
+  const [hasSignature, setHasSignature] = useState<boolean>(false);
+  const [workNotes, setWorkNotes] = useState<string>('');
   const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const handleSubmit = async () => {
     if (!beforeImage || !afterImage) {
@@ -45,15 +42,20 @@ export const JobCompletionScreen: React.FC<Props> = ({ navigation, route }) => {
       return;
     }
 
-    // Complete active job in state (calls backend POST /workers/bookings/{bookingId}/complete and credits wallet)
-    await completeActiveJob({
-      beforeImageUri: beforeImage,
-      afterImageUri: afterImage,
-      customerSignatureUri: hasSignature ? 'signed_valid_token' : undefined,
-      notes: workNotes,
-    });
-
-    setShowSuccessModal(true);
+    setIsSubmitting(true);
+    try {
+      await completeActiveJob({
+        beforeImageUri: beforeImage,
+        afterImageUri: afterImage,
+        customerSignatureUri: hasSignature ? 'signed_valid_token' : undefined,
+        notes: workNotes,
+      });
+      setShowSuccessModal(true);
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to complete job');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleFinishAndExit = () => {
@@ -70,15 +72,19 @@ export const JobCompletionScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Top Header */}
+      <CustomHeader
         title="Job Completion"
         subtitle={`Order #${job.jobId} Proof & Verification`}
         showBack
         onBack={() => navigation.goBack()}
       />
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Payout Summary Ribbon */}
         <View style={styles.payoutRibbon}>
           <View>
@@ -89,10 +95,10 @@ export const JobCompletionScreen: React.FC<Props> = ({ navigation, route }) => {
         </View>
 
         {/* Before and After Proofs Upload UI */}
-        <View style={styles.card}>
+        <PremiumCard style={styles.card}>
           <Text style={styles.cardTitle}>Service Proof Photos *</Text>
           <Text style={styles.cardSub}>
-            Take clear photos before starting and after finishing the work.
+            Take clear photos before starting and after completing the work.
           </Text>
 
           <View style={styles.photoGrid}>
@@ -106,7 +112,7 @@ export const JobCompletionScreen: React.FC<Props> = ({ navigation, route }) => {
                   setBeforeImage(
                     beforeImage
                       ? null
-                      : 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=400&q=80'
+                      : 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=400'
                   )
                 }
               >
@@ -114,7 +120,7 @@ export const JobCompletionScreen: React.FC<Props> = ({ navigation, route }) => {
                   <>
                     <Image source={{ uri: beforeImage }} style={styles.previewImage} />
                     <View style={styles.photoStatusBadge}>
-                      <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+                      <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
                     </View>
                   </>
                 ) : (
@@ -136,7 +142,7 @@ export const JobCompletionScreen: React.FC<Props> = ({ navigation, route }) => {
                   setAfterImage(
                     afterImage
                       ? null
-                      : 'https://images.unsplash.com/photo-1584622781564-1d987f7333c1?w=400&q=80'
+                      : 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=400'
                   )
                 }
               >
@@ -144,7 +150,7 @@ export const JobCompletionScreen: React.FC<Props> = ({ navigation, route }) => {
                   <>
                     <Image source={{ uri: afterImage }} style={styles.previewImage} />
                     <View style={styles.photoStatusBadge}>
-                      <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+                      <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
                     </View>
                   </>
                 ) : (
@@ -156,12 +162,12 @@ export const JobCompletionScreen: React.FC<Props> = ({ navigation, route }) => {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </PremiumCard>
 
-        {/* Customer Signature Pad Simulation */}
-        <View style={styles.card}>
+        {/* Customer Signature Pad */}
+        <PremiumCard style={styles.card}>
           <View style={styles.sigHeaderRow}>
-            <Text style={styles.cardTitle}>Customer Digital Signature</Text>
+            <Text style={styles.cardTitle}>Customer Digital Sign-Off</Text>
             <Text style={styles.optionalTag}>(Optional)</Text>
           </View>
           <Text style={styles.cardSub}>
@@ -175,46 +181,49 @@ export const JobCompletionScreen: React.FC<Props> = ({ navigation, route }) => {
           >
             {hasSignature ? (
               <View style={styles.signatureContent}>
-                {/* Simulated signature cursive lines */}
                 <Text style={styles.signatureSampleText}>{job.customer.name}</Text>
-                <Text style={styles.signedPill}>
-                  ✓ Digitally Verified Signature • {new Date().toLocaleTimeString()}
-                </Text>
+                <View style={styles.signedPill}>
+                  <Ionicons name="checkmark-circle-outline" size={14} color={colors.primary} />
+                  <Text style={styles.signedPillText}>
+                    Digitally Verified • {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </Text>
+                </View>
               </View>
             ) : (
               <View style={styles.signaturePlaceholder}>
-                <Ionicons name="pencil" size={24} color={colors.textMuted} />
+                <Ionicons name="pencil-outline" size={24} color={colors.textSecondary} />
                 <Text style={styles.sigPlaceholderText}>
-                  Tap here to capture customer finger signature
+                  Tap here to capture customer sign-off
                 </Text>
               </View>
             )}
           </TouchableOpacity>
-        </View>
+        </PremiumCard>
 
         {/* Worker Completion Notes */}
-        <View style={styles.card}>
-          <Input
-            label="Service Summary Notes"
+        <PremiumCard style={styles.card}>
+          <Text style={styles.cardTitle}>Service Summary Notes</Text>
+          <TextInput
             placeholder="Add any extra parts used or details for customer..."
+            placeholderTextColor={colors.textSecondary}
             value={workNotes}
             onChangeText={setWorkNotes}
             multiline
             numberOfLines={3}
-            inputStyle={{ minHeight: 70, textAlignVertical: 'top' }}
+            style={styles.notesInput}
           />
-        </View>
+        </PremiumCard>
       </ScrollView>
 
       {/* Submit Button */}
       <View style={styles.footer}>
-        <Button
-          title="Submit & Settle Payout ₹"
-          variant="success"
+        <PrimaryButton
+          title="Submit & Settle Payout"
           size="lg"
           fullWidth
+          loading={isSubmitting}
           onPress={handleSubmit}
-          icon={<Ionicons name="shield-checkmark" size={18} color={colors.textInverse} />}
+          icon={<Ionicons name="shield-checkmark-outline" size={20} color="#FFFFFF" />}
         />
       </View>
 
@@ -223,13 +232,13 @@ export const JobCompletionScreen: React.FC<Props> = ({ navigation, route }) => {
         <View style={styles.modalOverlay}>
           <View style={styles.celebrationCard}>
             <View style={styles.confettiCircle}>
-              <Ionicons name="trophy" size={44} color={colors.accent} />
+              <Ionicons name="trophy-outline" size={40} color={colors.primary} />
             </View>
 
-            <Text style={styles.modalTitle}>Job Completed Successfully!</Text>
+            <Text style={styles.modalTitle}>Job Completed!</Text>
             <Text style={styles.modalSub}>
-              Great work! Payout of <Text style={styles.highlightPay}>₹{job.netPayout}</Text> has
-              been credited to your HomeEase wallet instantly.
+              Great work! Net payout of <Text style={styles.highlightPay}>₹{job.netPayout}</Text> has
+              been credited to your partner wallet.
             </Text>
 
             <View style={styles.summaryBreakdown}>
@@ -238,7 +247,7 @@ export const JobCompletionScreen: React.FC<Props> = ({ navigation, route }) => {
                 <Text style={styles.sumVal}>₹{job.price}</Text>
               </View>
               <View style={styles.summaryItem}>
-                <Text style={styles.sumLbl}>Commission (15%)</Text>
+                <Text style={styles.sumLbl}>Platform Fee (15%)</Text>
                 <Text style={[styles.sumVal, { color: colors.danger }]}>- ₹{job.commission}</Text>
               </View>
               <View style={[styles.summaryItem, styles.sumTotalItem]}>
@@ -247,9 +256,8 @@ export const JobCompletionScreen: React.FC<Props> = ({ navigation, route }) => {
               </View>
             </View>
 
-            <Button
+            <PrimaryButton
               title="Go to Earnings & Wallet"
-              variant="primary"
               size="lg"
               fullWidth
               onPress={handleFinishAndExit}
@@ -268,55 +276,48 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   scrollContent: {
-    padding: spacing.lg,
+    padding: spacing.md,
     paddingBottom: spacing.xxl,
   },
   payoutRibbon: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.primary,
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
     ...shadows.sm,
   },
   ribbonLabel: {
-    ...typography.caption,
-    color: '#93C5FD',
-    fontWeight: '700',
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '600',
   },
   ribbonService: {
-    ...typography.subtitle1,
-    color: colors.textInverse,
+    fontSize: 16,
+    color: '#FFFFFF',
     fontWeight: '700',
     marginTop: 2,
   },
   ribbonAmount: {
-    fontSize: 28,
-    fontWeight: '900',
-    color: '#4ADE80',
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
   card: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
     marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    ...shadows.sm,
   },
   cardTitle: {
-    ...typography.subtitle1,
-    color: colors.textPrimary,
+    fontSize: 15,
     fontWeight: '700',
+    color: colors.textPrimary,
   },
   cardSub: {
-    ...typography.caption,
+    fontSize: 12,
     color: colors.textSecondary,
-    marginTop: 2,
+    marginTop: 3,
     marginBottom: spacing.md,
-    lineHeight: 16,
   },
   photoGrid: {
     flexDirection: 'row',
@@ -326,19 +327,21 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   photoLabel: {
-    ...typography.caption,
-    color: colors.textPrimary,
-    fontWeight: '700',
-    marginBottom: spacing.xs,
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginBottom: 6,
   },
   photoBox: {
-    height: 130,
+    height: 120,
     borderRadius: borderRadius.md,
     borderWidth: 1.5,
+    borderStyle: 'dashed',
     borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
     overflow: 'hidden',
-    position: 'relative',
   },
   previewImage: {
     width: '100%',
@@ -348,18 +351,16 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 6,
     right: 6,
-    backgroundColor: colors.surface,
+    backgroundColor: '#FFFFFF',
     borderRadius: 10,
   },
   uploadPlaceholder: {
-    flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   placeholderText: {
-    ...typography.caption,
+    fontSize: 12,
+    fontWeight: '600',
     color: colors.primary,
-    fontWeight: '700',
     marginTop: 4,
   },
   sigHeaderRow: {
@@ -368,132 +369,147 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   optionalTag: {
-    ...typography.caption,
-    color: colors.textMuted,
+    fontSize: 11,
+    color: colors.textSecondary,
   },
   signatureBox: {
-    height: 110,
+    height: 100,
     borderRadius: borderRadius.md,
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: colors.borderDark,
-    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
+    padding: spacing.md,
   },
   signatureBoxSigned: {
-    borderStyle: 'solid',
     borderColor: colors.primary,
-    backgroundColor: colors.primaryLighter,
+    backgroundColor: colors.primaryLight,
   },
   signatureContent: {
     alignItems: 'center',
-    justifyContent: 'center',
   },
   signatureSampleText: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: '600',
+    color: colors.textPrimary,
     fontStyle: 'italic',
-    color: colors.primaryDark,
-    letterSpacing: 2,
   },
   signedPill: {
-    ...typography.caption,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  signedPillText: {
+    fontSize: 11,
+    fontWeight: '600',
     color: colors.primary,
-    fontWeight: '700',
-    marginTop: 6,
-    fontSize: 10,
   },
   signaturePlaceholder: {
     alignItems: 'center',
+    gap: 4,
   },
   sigPlaceholderText: {
-    ...typography.caption,
-    color: colors.textMuted,
-    marginTop: 4,
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+  notesInput: {
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    fontSize: 13,
+    color: colors.textPrimary,
+    minHeight: 80,
+    textAlignVertical: 'top',
+    marginTop: spacing.sm,
   },
   footer: {
-    padding: spacing.lg,
-    backgroundColor: colors.surface,
+    padding: spacing.md,
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
+    borderTopColor: colors.border,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: colors.overlay,
+    backgroundColor: 'rgba(23, 36, 58, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.xl,
+    padding: spacing.lg,
   },
   celebrationCard: {
-    backgroundColor: colors.surface,
+    width: '100%',
+    backgroundColor: '#FFFFFF',
     borderRadius: borderRadius.xl,
     padding: spacing.xl,
     alignItems: 'center',
-    width: '100%',
-    ...shadows.lg,
+    ...shadows.md,
   },
   confettiCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: colors.warningLight,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
   },
   modalTitle: {
-    ...typography.h2,
+    fontSize: 20,
+    fontWeight: '800',
     color: colors.textPrimary,
-    textAlign: 'center',
   },
   modalSub: {
-    ...typography.body2,
+    fontSize: 13,
     color: colors.textSecondary,
     textAlign: 'center',
-    marginTop: spacing.xs,
-    lineHeight: 20,
+    marginTop: 6,
+    lineHeight: 18,
+    marginBottom: spacing.lg,
   },
   highlightPay: {
-    color: colors.success,
+    color: colors.primary,
     fontWeight: '800',
   },
   summaryBreakdown: {
     width: '100%',
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: colors.background,
     borderRadius: borderRadius.md,
     padding: spacing.md,
-    marginTop: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   summaryItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 3,
+    paddingVertical: 4,
   },
   sumLbl: {
-    ...typography.caption,
+    fontSize: 13,
     color: colors.textSecondary,
   },
   sumVal: {
-    ...typography.caption,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '600',
     color: colors.textPrimary,
   },
   sumTotalItem: {
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    paddingTop: 6,
+    paddingTop: 8,
     marginTop: 4,
   },
   sumTotalLbl: {
-    ...typography.subtitle2,
+    fontSize: 14,
+    fontWeight: '700',
     color: colors.textPrimary,
-    fontWeight: '800',
   },
   sumTotalVal: {
-    ...typography.subtitle1,
-    color: colors.success,
-    fontWeight: '900',
+    fontSize: 16,
+    fontWeight: '800',
+    color: colors.primary,
   },
 });
 

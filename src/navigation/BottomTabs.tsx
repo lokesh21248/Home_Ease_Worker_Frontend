@@ -1,11 +1,11 @@
 import React from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
+import { StyleSheet, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { BottomTabParamList } from './types';
 import { colors } from '../theme/colors';
-import { typography } from '../theme/typography';
 import { HomeDashboardScreen } from '../screens/dashboard/HomeDashboardScreen';
+import { SlotsScreen } from '../screens/slots/SlotsScreen';
 import { JobsTabScreen } from '../screens/jobs/JobsTabScreen';
 import { EarningsScreen } from '../screens/earnings/EarningsScreen';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
@@ -21,9 +21,10 @@ export const BottomTabs: React.FC = () => {
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textMuted,
+        tabBarInactiveTintColor: colors.textSecondary,
         tabBarStyle: styles.tabBar,
         tabBarLabelStyle: styles.tabLabel,
+        tabBarItemStyle: styles.tabItem,
       }}
     >
       <Tab.Screen
@@ -34,7 +35,22 @@ export const BottomTabs: React.FC = () => {
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'home' : 'home-outline'}
-              size={22}
+              size={21}
+              color={color}
+            />
+          ),
+        }}
+      />
+
+      <Tab.Screen
+        name="SlotsTab"
+        component={SlotsScreen}
+        options={{
+          tabBarLabel: 'Slots',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? 'calendar' : 'calendar-outline'}
+              size={21}
               color={color}
             />
           ),
@@ -51,7 +67,7 @@ export const BottomTabs: React.FC = () => {
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'briefcase' : 'briefcase-outline'}
-              size={22}
+              size={21}
               color={color}
             />
           ),
@@ -66,7 +82,7 @@ export const BottomTabs: React.FC = () => {
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'wallet' : 'wallet-outline'}
-              size={22}
+              size={21}
               color={color}
             />
           ),
@@ -81,7 +97,7 @@ export const BottomTabs: React.FC = () => {
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'person' : 'person-outline'}
-              size={22}
+              size={21}
               color={color}
             />
           ),
@@ -93,23 +109,33 @@ export const BottomTabs: React.FC = () => {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: colors.surface,
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
-    height: Platform.OS === 'ios' ? 88 : 64,
-    paddingBottom: Platform.OS === 'ios' ? 28 : 8,
+    borderTopColor: colors.border,
+    height: Platform.OS === 'ios' ? 88 : 66,
+    paddingBottom: Platform.OS === 'ios' ? 26 : 10,
     paddingTop: 8,
+    shadowColor: '#173B8F',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  tabItem: {
+    paddingVertical: 2,
   },
   tabLabel: {
-    ...typography.caption,
-    fontWeight: '700',
     fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
   },
   badge: {
     backgroundColor: colors.primary,
-    color: colors.textInverse,
+    color: '#FFFFFF',
     fontSize: 10,
     fontWeight: '800',
+    minWidth: 16,
+    height: 16,
   },
 });
 
