@@ -40,6 +40,8 @@ export const API_ENDPOINTS = {
   BOOKINGS: {
     ACCEPT: (bookingId: string) => `/workers/bookings/${bookingId}/accept`,
     REJECT: (bookingId: string) => `/workers/bookings/${bookingId}/reject`,
+    ON_THE_WAY: (bookingId: string) => `/workers/bookings/${bookingId}/on-the-way`,
+    ARRIVE: (bookingId: string) => `/workers/bookings/${bookingId}/arrive`,
     VERIFY_PIN: (bookingId: string) => `/workers/bookings/${bookingId}/verify-pin`,
     ADD_SUB_SERVICE: (bookingId: string) => `/workers/bookings/${bookingId}/add-sub-service`,
     COMPLETE: (bookingId: string) => `/workers/bookings/${bookingId}/complete`,

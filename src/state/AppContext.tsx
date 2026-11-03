@@ -1028,6 +1028,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: newStatus,
       timeline: updatedTimeline,
     });
+
+    const bId = resolveBookingUuid(activeJob.bookingId, activeJob.id);
+    if (newStatus === 'travelling') {
+      workerApiService.startTravelling(bId).catch((e) => console.warn('[AppContext] startTravelling:', e?.message));
+    } else if (newStatus === 'arrived') {
+      workerApiService.arriveAtCustomer(bId).catch((e) => console.warn('[AppContext] arriveAtCustomer:', e?.message));
+    }
   };
 
   const completeActiveJob = async (completionData: {

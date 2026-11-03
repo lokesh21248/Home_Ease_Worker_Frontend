@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,8 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { useApp } from '../../state/AppContext';
 import { openTurnByTurnNavigation } from '../../utils/navigationHelper';
 import { alertFeedbackService } from '../../services/alertFeedbackService';
+import { locationService } from '../../services/locationService';
+import { workerApiService } from '../../api/workerApiService';
 import { resolveBookingUuid } from '../../utils/uuid';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'NavigationTracking'>;
@@ -35,9 +37,11 @@ interface ChatMessage {
 export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route }) => {
   const { job } = route.params;
   const { updateJobStatus } = useApp();
+  const bookingId = resolveBookingUuid(job.bookingId, job.id);
 
-  const [etaMins] = useState(8);
-  const [distanceKm] = useState(job.location.distanceKm || 1.8);
+  const [etaMins, setEtaMins] = useState(8);
+  const [distanceKm, setDistanceKm] = useState(job.location.distanceKm || 1.8);
+  const [isArriving, setIsArriving] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -54,6 +58,50 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
       time: '11:16 AM',
     },
   ]);
+
+  // Live GPS broadcast loop (every 5 seconds) to port 8082 tracking microservice
+  useEffect(() => {
+    let isMounted = true;
+
+    // Immediately trigger ON_THE_WAY on backend
+    workerApiService.startTravelling(bookingId).catch(() => {});
+
+    const streamGpsLocation = async () => {
+      try {
+        const loc = await locationService.getCurrentLocation();
+        if (loc && isMounted) {
+          // 1. Broadcast real GPS coordinates to Port 8082 tracking service
+          await workerApiService.publishLiveLocation(bookingId, loc.latitude, loc.longitude);
+
+          // 2. Query live road distance and ETA
+          if (job.location.latitude && job.location.longitude) {
+            const distanceData = await workerApiService.getLiveDistanceAndEta(
+              bookingId,
+              job.location.latitude,
+              job.location.longitude
+            );
+            if (distanceData && isMounted) {
+              setDistanceKm(distanceData.distanceKm);
+              setEtaMins(distanceData.etaMinutes);
+            }
+          }
+        }
+      } catch (err: any) {
+        console.warn('[NavigationTrackingScreen] GPS stream notice:', err?.message);
+      }
+    };
+
+    // Run immediately on screen open
+    streamGpsLocation();
+
+    // Repeat every 5 seconds while on this screen
+    const interval = setInterval(streamGpsLocation, 5000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [bookingId, job.location.latitude, job.location.longitude]);
 
   const handleSendMessage = () => {
     if (!chatInput.trim()) return;
@@ -79,10 +127,21 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
     }, 1200);
   };
 
-  const handleArrived = () => {
+  const handleArrived = async () => {
+    if (isArriving) return;
+    setIsArriving(true);
     alertFeedbackService.playSuccessFeedback();
+
+    try {
+      // 1. Sync Arrival with Backend Monolith (POST /workers/bookings/{id}/arrive)
+      // This atomically updates booking status to ARRIVED and generates the service start OTP
+      await workerApiService.arriveAtCustomer(bookingId);
+    } catch (err: any) {
+      console.warn('[NavigationTrackingScreen] arriveAtCustomer backend sync:', err?.message);
+    }
+
     updateJobStatus('arrived');
-    const bookingId = resolveBookingUuid(job.bookingId, job.id);
+    setIsArriving(false);
     navigation.navigate('ActiveJob', { job: { ...job, bookingId, status: 'arrived' }, bookingId });
   };
 
@@ -242,9 +301,10 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
         </View>
 
         <PrimaryButton
-          title="I Have Arrived at Location"
+          title={isArriving ? "Confirming Arrival..." : "I Have Arrived at Location"}
           size="lg"
           fullWidth
+          loading={isArriving}
           onPress={handleArrived}
           icon={<Ionicons name="location-outline" size={20} color="#FFFFFF" />}
         />
