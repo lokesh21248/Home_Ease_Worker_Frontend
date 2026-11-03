@@ -473,7 +473,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Poll incoming job dispatch requests every 15s
       requestsInterval = setInterval(() => {
         fetchJobRequests().catch(() => {});
-      }, 15000);
+      }, 4000);
     }
 
     return () => {
