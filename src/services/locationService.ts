@@ -9,6 +9,9 @@ export interface LocationData {
   city: string;
   district?: string;
   fullAddress?: string;
+  heading?: number;
+  speed?: number;
+  accuracy?: number;
 }
 
 export type GpsStatus = 'online' | 'offline' | 'unavailable';
@@ -107,7 +110,7 @@ class LocationService {
         accuracy: Location.Accuracy.Balanced,
       });
 
-      const { latitude, longitude } = position.coords;
+      const { latitude, longitude, heading, speed, accuracy } = position.coords;
       const reverse = await this.reverseGeocode(latitude, longitude);
 
       const locationData: LocationData = {
@@ -117,6 +120,9 @@ class LocationService {
         city: reverse.city,
         district: reverse.district,
         fullAddress: reverse.fullAddress,
+        heading: typeof heading === 'number' && !isNaN(heading) ? heading : 0,
+        speed: typeof speed === 'number' && !isNaN(speed) ? Math.max(0, speed) : 0,
+        accuracy: typeof accuracy === 'number' && !isNaN(accuracy) ? accuracy : 5.0,
       };
 
       this.lastLocation = locationData;

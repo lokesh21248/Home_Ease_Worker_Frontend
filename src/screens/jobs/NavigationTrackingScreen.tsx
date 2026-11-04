@@ -70,8 +70,15 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
       try {
         const loc = await locationService.getCurrentLocation();
         if (loc && isMounted) {
-          // 1. Broadcast real GPS coordinates to Port 8082 tracking service
-          await workerApiService.publishLiveLocation(bookingId, loc.latitude, loc.longitude);
+          // 1. Broadcast real GPS coordinates to Port 8082 tracking service with bearing, speed & accuracy
+          await workerApiService.publishLiveLocation(
+            bookingId,
+            loc.latitude,
+            loc.longitude,
+            loc.heading ?? 0,
+            loc.speed ?? 0,
+            loc.accuracy ?? 5.0
+          );
 
           // 2. Query live road distance and ETA
           if (job.location.latitude && job.location.longitude) {

@@ -550,7 +550,8 @@ class WorkerApiService {
     lat: number,
     lng: number,
     bearing: number = 0,
-    speed: number = 0
+    speed: number = 0,
+    accuracy: number = 5.0
   ): Promise<any> {
     const resolvedBookingId = resolveBookingUuid(bookingId);
     const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
@@ -567,6 +568,7 @@ class WorkerApiService {
         lng,
         bearing,
         speed,
+        accuracy,
         workerId: activeUserId,
         partnerId: activeUserId,
       };
