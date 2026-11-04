@@ -8,13 +8,21 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "UIBackgroundModes": ["location", "fetch"],
+        "NSLocationWhenInUseUsageDescription": "HomeEase Partner requires your location to route service requests and provide turn-by-turn navigation.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "HomeEase Partner requires background location to show customers your live arrival progress while you travel to their doorstep."
+      }
     },
     "android": {
       "package": "com.homeease.worker",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
         "VIBRATE",
         "POST_NOTIFICATIONS"
       ],
