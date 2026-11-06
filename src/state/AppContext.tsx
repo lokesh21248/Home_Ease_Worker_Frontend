@@ -306,7 +306,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (status === 401 || status === 403) {
         // Session expired / invalid token -- re-throw so session restore can handle it
         console.warn('[AppContext] fetchWorkerProfile: auth error, re-throwing', status);
-        throw err;
+      throw err;
       }
       // Network / server errors: log but do not crash the UI -- UI still shows cached data
       console.warn('[AppContext] fetchWorkerProfile error:', status, err?.message);
@@ -873,12 +873,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       fetchSchedules().catch(() => {});
     } catch (err: any) {
       console.warn('[AppContext] acceptJob backend sync error:', err);
-      const errorMsg =
-        err?.response?.data?.message || err?.message || 'Failed to accept booking.';
+      const isConflict = err?.status === 409 || err?.isConflict || err?.response?.status === 409;
+      const errorMsg = isConflict ? "Another partner accepted this job faster." : (err?.response?.data?.message || err?.message || "Failed to accept booking.");
       setActiveJob(null);
       setJobRequests((prev) => [job, ...prev.filter((j) => j.id !== jobId && j.bookingId !== jobId)]);
-      setActiveBannerAlert(`⚠️ Booking Conflict: ${errorMsg}`);
-      alertFeedbackService.playTouchFeedback('heavy');
+      setActiveBannerAlert(isConflict ? "⚠️ Job Taken: Another partner accepted this request faster." : `⚠️ Booking Conflict: ${errorMsg}`);
+      alertFeedbackService.playTouchFeedback("heavy");
+      throw err;
     }
   };
 
@@ -1050,6 +1051,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // End-to-end Backend Job Complete (POST /workers/bookings/{bookingId}/complete)
     try {
+      if (completionData.beforeImageUri) {
+        await workerApiService.uploadJobProof(bId, completionData.beforeImageUri, 'before').catch(() => {});
+      }
+      if (completionData.afterImageUri) {
+        await workerApiService.uploadJobProof(bId, completionData.afterImageUri, 'after').catch(() => {});
+      }
       await workerApiService.completeBooking(bId);
     } catch (err) {
       console.warn('[AppContext] completeBooking backend sync notice:', err);

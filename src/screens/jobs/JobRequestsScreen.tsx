@@ -22,6 +22,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { useApp } from '../../state/AppContext';
 import { alertFeedbackService } from '../../services/alertFeedbackService';
 import { resolveBookingUuid } from '../../utils/uuid';
+import { safeGoBack } from '../../utils/navigationHelper';
 
 export const JobRequestsScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -83,7 +84,7 @@ export const JobRequestsScreen: React.FC = () => {
         title="Job Requests"
         subtitle={`${jobRequests.length} active leads nearby`}
         showBack
-        onBack={() => navigation.goBack()}
+        onBack={() => safeGoBack(navigation, 'MainTabs', { screen: 'HomeTab' })}
         rightAction={
           <TouchableOpacity
             style={styles.refreshBtn}

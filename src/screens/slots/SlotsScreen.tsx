@@ -27,7 +27,7 @@ import { SecondaryButton } from '../../components/SecondaryButton';
 import { EmptyState } from '../../components/EmptyState';
 import { LoadingSkeleton, SkeletonCardList } from '../../components/LoadingSkeleton';
 
-type FilterType = 'all' | 'today' | 'upcoming' | 'completed' | 'cancelled';
+type FilterType = 'all' | 'today' | 'tomorrow' | 'upcoming' | 'completed' | 'cancelled';
 
 export const SlotsScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -87,6 +87,12 @@ export const SlotsScreen: React.FC = () => {
       if (filter === 'today') {
         const todayStr = new Date().toISOString().split('T')[0];
         return slotDate === todayStr;
+      }
+      if (filter === 'tomorrow') {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowStr = tomorrow.toISOString().split('T')[0];
+        return slotDate === tomorrowStr;
       }
       if (filter === 'upcoming') {
         const todayStr = new Date().toISOString().split('T')[0];
@@ -198,7 +204,7 @@ export const SlotsScreen: React.FC = () => {
 
         {/* Filter Chips */}
         <View style={styles.filtersRow}>
-          {(['all', 'today', 'upcoming', 'completed', 'cancelled'] as const).map((tab) => {
+          {(['all', 'today', 'tomorrow', 'upcoming', 'completed', 'cancelled'] as const).map((tab) => {
             const isActive = filter === tab;
             return (
               <TouchableOpacity

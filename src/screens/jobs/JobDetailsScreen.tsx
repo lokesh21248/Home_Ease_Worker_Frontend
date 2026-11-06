@@ -20,7 +20,7 @@ import { PremiumCard } from '../../components/PremiumCard';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { SecondaryButton } from '../../components/SecondaryButton';
 import { useApp } from '../../state/AppContext';
-import { openTurnByTurnNavigation } from '../../utils/navigationHelper';
+import { openTurnByTurnNavigation, safeGoBack } from '../../utils/navigationHelper';
 import { resolveBookingUuid } from '../../utils/uuid';
 import { workerApiService } from '../../api/workerApiService';
 
@@ -63,7 +63,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           style: 'destructive',
           onPress: () => {
             rejectJob(job.id);
-            navigation.goBack();
+            safeGoBack(navigation, 'MainTabs', { screen: 'JobsTab' });
           },
         },
       ]
@@ -90,7 +90,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         title={`Booking #${job.jobId}`}
         subtitle={job.category || 'Home Service'}
         showBack
-        onBack={() => navigation.goBack()}
+        onBack={() => safeGoBack(navigation, 'MainTabs', { screen: 'JobsTab' })}
         rightAction={
           <View
             style={[

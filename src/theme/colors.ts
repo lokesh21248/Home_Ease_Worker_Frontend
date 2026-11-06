@@ -1,56 +1,61 @@
 /**
- * HomeEase Worker - Blue & White Theme Palette
- * Inspired by Urban Company, premium fintech apps & clean Apple-style UI.
- * Strictly adheres to the #2454D6 primary blue & white color system.
+ * HomeEase Partner - Complete Pronto & Urban Company Theme Palette
+ * Brand Guidelines:
+ * Primary: #1769E0 (HomeEase Blue)
+ * Background: #FFFFFF
+ * Secondary Background: #F5F8FC
+ * Text: Dark Navy (#0F1E36)
+ * Cards: #FFFFFF with subtle borders (#E5EAF2)
  */
 
 export const colors = {
   // Brand Blue System
-  primary: '#2454D6',         // Primary Blue
-  primaryDark: '#173B8F',
-  secondary: '#173B8F',     // Dark Blue (Headers, active states, deep contrast)
-  primaryLight: '#4475F2',    // Lighter Blue (Highlights, focused elements)
-  primarySoft: '#EFF4FE',     // Ultra Soft Blue (Card accents, active pill backgrounds)
-  primaryLighter: '#F0F5FE',  // Light Blue tint
+  primary: '#1769E0',         // Primary Blue
+  primaryDark: '#0F4BB8',     // Rich Deep Blue
+  secondary: '#0E3378',       // Dark Navy Blue (Headers, contrast accents)
+  primaryLight: '#3D87F5',    // Lighter Blue (Highlights, focused elements)
+  primarySoft: '#EBF3FE',     // Ultra Soft Blue (Card accents, active pill backgrounds)
+  primaryLighter: '#F5F8FC',  // Secondary Background tint
 
   // Neutral Backgrounds & Cards
-  background: '#F5F8FE',      // Clean Premium App Background
+  background: '#FFFFFF',      // Clean Premium App Background
+  secondaryBackground: '#F5F8FC', // Secondary Background
   surface: '#FFFFFF',         // Card & Sheet Background
   card: '#FFFFFF',            // Explicit Card alias
-  surfaceAlt: '#F0F4FC',      // Input & Pill secondary background
+  surfaceAlt: '#F5F8FC',      // Input & Pill secondary background
   surfaceElevated: '#FFFFFF',
 
   // Typography
-  textPrimary: '#17243A',     // Primary Text (High contrast dark navy/slate)
-  textSecondary: '#718096',   // Secondary Text (Muted subtitle / caption)
-  textMuted: '#A0AEC0',       // Inactive icons & placeholders
+  textPrimary: '#0F1E36',     // Primary Text (Dark Navy)
+  textSecondary: '#6B7A90',   // Secondary Text (Muted subtitle / caption)
+  textMuted: '#9BA8B8',       // Inactive icons & placeholders
   textInverse: '#FFFFFF',     // White text on dark/blue buttons
-  textPrimaryBlue: '#2454D6', // Blue accented text
+  textPrimaryBlue: '#1769E0', // Blue accented text
 
   // Borders & Dividers
   border: '#E5EAF2',          // Subtle card & item borders
   borderLight: '#EDF2F9',     // Thin divider lines
   borderDark: '#CBD5E1',      // Input focus borders
 
-  // Status & Functional Accents (Subtle and harmonious with blue palette)
+  // Status & Functional Accents
   success: '#10B981',         // Verified, Completed, Accepted
   successLight: '#ECFDF5',    // Soft green tint
   warning: '#F59E0B',         // Pending, OTP, Warning
   warningLight: '#FFFBEB',    // Soft amber tint
   danger: '#EF4444',          // Rejected, Cancelled, Errors
   dangerLight: '#FEF2F2',     // Soft red tint
-  info: '#2454D6',            // Information (uses primary blue)
-  infoLight: '#EFF4FE',
+  info: '#1769E0',            // Information (uses primary blue)
+  infoLight: '#EBF3FE',
 
   // Shadows & Overlays
-  shadow: '#17243A',
-  overlay: 'rgba(23, 36, 58, 0.60)',
+  shadow: '#0F1E36',
+  overlay: 'rgba(15, 30, 54, 0.65)',
 
   // Legacy mappings for backward compatibility
   onlineGreen: '#10B981',
-  offlineGray: '#718096',
+  offlineGray: '#6B7A90',
   starGold: '#F59E0B',
-  accent: '#2454D6',
+  accent: '#1769E0',
 };
 
 export const darkColors = colors; // Keep consistent blue-and-white theme

@@ -60,3 +60,24 @@ export const openTurnByTurnNavigation = async ({
     }
   }
 };
+
+/**
+ * Safely navigates backwards if history exists, or redirects to the Worker Dashboard
+ * to prevent the unhandled 'GO_BACK' action crash in React Navigation.
+ */
+export const safeGoBack = (
+  navigation: any,
+  fallbackRoute: string = 'MainTabs',
+  fallbackParams: any = { screen: 'HomeTab' }
+): void => {
+  if (navigation && typeof navigation.canGoBack === 'function' && navigation.canGoBack()) {
+    navigation.goBack();
+  } else if (navigation && typeof navigation.reset === 'function') {
+    navigation.reset({
+      index: 0,
+      routes: [{ name: fallbackRoute, params: fallbackParams }],
+    });
+  } else if (navigation && typeof navigation.navigate === 'function') {
+    navigation.navigate(fallbackRoute, fallbackParams);
+  }
+};

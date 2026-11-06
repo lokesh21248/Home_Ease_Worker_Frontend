@@ -20,6 +20,7 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import Input from '../../components/Input';
 import { useApp } from '../../state/AppContext';
 import { workerApiService } from '../../api/workerApiService';
+import { safeGoBack } from '../../utils/navigationHelper';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'DocumentUpload'>;
 
@@ -97,7 +98,7 @@ export const DocumentUploadScreen: React.FC<Props> = ({ navigation, route }) => 
     if (isOnboarding) {
       navigation.navigate('ServiceSelection', { isOnboarding: true });
     } else {
-      navigation.goBack();
+      safeGoBack(navigation, 'MainTabs', { screen: 'ProfileTab' });
     }
   };
 
@@ -107,7 +108,13 @@ export const DocumentUploadScreen: React.FC<Props> = ({ navigation, route }) => 
         title="Document Verification"
         subtitle={isOnboarding ? 'Step 3 of 5 • KYC & Licenses' : 'Manage KYC & Credentials'}
         showBack
-        onBack={() => navigation.goBack()}
+        onBack={() =>
+          safeGoBack(
+            navigation,
+            isOnboarding ? 'ProfileSetup' : 'MainTabs',
+            isOnboarding ? undefined : { screen: 'ProfileTab' }
+          )
+        }
       />
 
       {isOnboarding ? (

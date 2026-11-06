@@ -23,6 +23,7 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { SecondaryButton } from '../../components/SecondaryButton';
 import { useApp } from '../../state/AppContext';
 import { DaySchedule } from '../../types';
+import { safeGoBack } from '../../utils/navigationHelper';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AvailabilitySetup'>;
 
@@ -172,6 +173,7 @@ export const AvailabilitySetupScreen: React.FC<Props> = ({ navigation, route }) 
   };
 
   const handleFinish = async () => {
+    if (isSaving) return;
     setIsSaving(true);
     try {
       updateAvailability({
@@ -219,10 +221,10 @@ export const AvailabilitySetupScreen: React.FC<Props> = ({ navigation, route }) 
 
         navigation.reset({
           index: 0,
-          routes: [{ name: 'MainTabs' }],
+          routes: [{ name: 'MainTabs', params: { screen: 'HomeTab' } }],
         });
       } else {
-        navigation.goBack();
+        safeGoBack(navigation, 'MainTabs', { screen: 'HomeTab' });
       }
     } catch (err: any) {
       console.error('[AvailabilitySetup] save error:', err);
@@ -238,7 +240,7 @@ export const AvailabilitySetupScreen: React.FC<Props> = ({ navigation, route }) 
         title="Schedule & Availability"
         subtitle={isOnboarding ? 'Step 5 of 5 • Final Setup' : 'Configure work hours & breaks'}
         showBack
-        onBack={() => navigation.goBack()}
+        onBack={() => safeGoBack(navigation, 'MainTabs', { screen: 'HomeTab' })}
       />
 
       {isOnboarding ? (

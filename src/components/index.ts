@@ -19,3 +19,4 @@ export { CustomHeader } from './CustomHeader';
 export { LoadingSkeleton, SkeletonCardList } from './LoadingSkeleton';
 export { BookingCard } from './BookingCard';
 export { SlotCalendar } from './SlotCalendar';
+export { IncomingJobRequestModal } from './IncomingJobRequestModal';

@@ -146,22 +146,34 @@ class WebSocketService {
     if (this.currentUserId) {
       const userDest = `/topic/worker/${this.currentUserId}/requests`;
       this.sendFrame('SUBSCRIBE', {
-        id: 'sub-user',
+        id: 'sub-user-req',
         destination: userDest,
         ack: 'auto',
       });
-      console.log('[WebSocketService] Subscribed to:', userDest);
+      const userStreamDest = `/topic/worker/${this.currentUserId}/stream`;
+      this.sendFrame('SUBSCRIBE', {
+        id: 'sub-user-stream',
+        destination: userStreamDest,
+        ack: 'auto',
+      });
+      console.log('[WebSocketService] Subscribed to:', userDest, userStreamDest);
     }
 
     // Subscribe to workerId topic
     if (this.currentWorkerId && this.currentWorkerId !== this.currentUserId) {
       const workerDest = `/topic/worker/${this.currentWorkerId}/requests`;
       this.sendFrame('SUBSCRIBE', {
-        id: 'sub-worker',
+        id: 'sub-worker-req',
         destination: workerDest,
         ack: 'auto',
       });
-      console.log('[WebSocketService] Subscribed to:', workerDest);
+      const workerStreamDest = `/topic/worker/${this.currentWorkerId}/stream`;
+      this.sendFrame('SUBSCRIBE', {
+        id: 'sub-worker-stream',
+        destination: workerStreamDest,
+        ack: 'auto',
+      });
+      console.log('[WebSocketService] Subscribed to:', workerDest, workerStreamDest);
     }
   }
 

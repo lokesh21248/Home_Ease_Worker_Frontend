@@ -22,6 +22,7 @@ import { PremiumCard } from '../../components/PremiumCard';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { SecondaryButton } from '../../components/SecondaryButton';
 import { useApp } from '../../state/AppContext';
+import { safeGoBack } from '../../utils/navigationHelper';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'JobCompletion'>;
 
@@ -78,7 +79,7 @@ export const JobCompletionScreen: React.FC<Props> = ({ navigation, route }) => {
         title="Job Completion"
         subtitle={`Order #${job.jobId} Proof & Verification`}
         showBack
-        onBack={() => navigation.goBack()}
+        onBack={() => safeGoBack(navigation, 'MainTabs', { screen: 'JobsTab' })}
       />
 
       <ScrollView

@@ -22,6 +22,7 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import Input from '../../components/Input';
 import { useApp } from '../../state/AppContext';
 import { workerApiService } from '../../api/workerApiService';
+import { safeGoBack } from '../../utils/navigationHelper';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProfileSetup'>;
 
@@ -77,7 +78,7 @@ export const ProfileSetupScreen: React.FC<Props> = ({ navigation }) => {
         title="Professional Profile"
         subtitle="Step 2 of 5 • Photo & Bio"
         showBack
-        onBack={() => navigation.goBack()}
+        onBack={() => safeGoBack(navigation, 'CreateAccount')}
       />
 
       <View style={styles.progressBarContainer}>

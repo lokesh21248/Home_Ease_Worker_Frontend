@@ -10,6 +10,7 @@ import {
   Switch,
   RefreshControl,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,6 +28,8 @@ import { BookingCard } from '../../components/BookingCard';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { SecondaryButton } from '../../components/SecondaryButton';
 import { EmptyState } from '../../components/EmptyState';
+import { IncomingJobRequestModal } from '../../components/IncomingJobRequestModal';
+import { Job } from '../../types';
 
 export const HomeDashboardScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -51,6 +54,45 @@ export const HomeDashboardScreen: React.FC = () => {
 
   const [refreshing, setRefreshing] = useState(false);
   const [isRefreshingLocation, setIsRefreshingLocation] = useState(false);
+  const [incomingModalJob, setIncomingModalJob] = useState<Job | null>(null);
+
+  const isOnline = worker.availability.isOnline;
+
+  // Pronto-Style: Auto-trigger incoming 30-second urgent modal when an eligible job is dispatched
+  useEffect(() => {
+    if (jobRequests.length > 0 && isOnline && !activeJob) {
+      setIncomingModalJob(jobRequests[0]);
+    } else {
+      setIncomingModalJob(null);
+    }
+  }, [jobRequests, isOnline, activeJob]);
+
+  const handleModalAccept = async (job: Job) => {
+    const bookingId = resolveBookingUuid(job.bookingId, job.id);
+    setIncomingModalJob(null);
+    try {
+      await acceptJob(bookingId);
+      navigation.navigate('ActiveJob', {
+        job: { ...job, id: bookingId, bookingId, status: 'accepted' },
+        bookingId,
+      });
+    } catch (err: any) {
+      if (err?.status === 409 || err?.isConflict) {
+        Alert.alert(
+          '⚠️ Job Already Accepted',
+          'Another nearby partner accepted this request faster. Stay online — new jobs are coming in!',
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert('Notice', err?.message || 'Failed to accept booking.');
+      }
+    }
+  };
+
+  const handleModalReject = (job: Job) => {
+    setIncomingModalJob(null);
+    rejectJob(job.id, 'Partner declined');
+  };
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -83,8 +125,6 @@ export const HomeDashboardScreen: React.FC = () => {
       fetchJobRequests().catch(() => {});
     }, [])
   );
-
-  const isOnline = worker.availability.isOnline;
 
   const getStatusDisplay = () => {
     if (gpsStatus === 'unavailable') {
@@ -420,6 +460,15 @@ export const HomeDashboardScreen: React.FC = () => {
           </PremiumCard>
         )}
       </ScrollView>
+
+      {/* Pronto-Style Real-time Incoming Dispatch Modal */}
+      <IncomingJobRequestModal
+        visible={!!incomingModalJob}
+        job={incomingModalJob}
+        onAccept={handleModalAccept}
+        onReject={handleModalReject}
+        countdownSeconds={30}
+      />
     </SafeAreaView>
   );
 };

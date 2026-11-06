@@ -21,6 +21,7 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import Input from '../../components/Input';
 import { useApp } from '../../state/AppContext';
 import { workerApiService } from '../../api/workerApiService';
+import { safeGoBack } from '../../utils/navigationHelper';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CreateAccount'>;
 
@@ -85,7 +86,7 @@ export const CreateAccountScreen: React.FC<Props> = ({ navigation, route }) => {
         title="Create Partner Profile"
         subtitle="Step 1 of 5 • Basic Details"
         showBack
-        onBack={() => navigation.goBack()}
+        onBack={() => safeGoBack(navigation, 'Login')}
       />
 
       {/* Progress Indicator */}

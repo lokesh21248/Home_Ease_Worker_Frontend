@@ -22,6 +22,7 @@ import { useApp } from '../../state/AppContext';
 import { workerApiService } from '../../api/workerApiService';
 import { apiClient } from '../../api/client';
 import { storageService } from '../../services/storageService';
+import { safeGoBack } from '../../utils/navigationHelper';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OtpVerification'>;
 
@@ -146,7 +147,7 @@ export const OtpVerificationScreen: React.FC<Props> = ({ navigation, route }) =>
       <CustomHeader
         title="Verification"
         showBack
-        onBack={() => navigation.goBack()}
+        onBack={() => safeGoBack(navigation, 'Login')}
       />
 
       <KeyboardAvoidingView
@@ -167,7 +168,7 @@ export const OtpVerificationScreen: React.FC<Props> = ({ navigation, route }) =>
             </Text>
 
             <TouchableOpacity
-              onPress={() => navigation.goBack()}
+              onPress={() => safeGoBack(navigation, 'Login')}
               style={styles.changeNumberRow}
               activeOpacity={0.7}
             >

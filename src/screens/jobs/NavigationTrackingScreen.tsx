@@ -19,7 +19,7 @@ import { borderRadius, shadows, spacing } from '../../theme/spacing';
 import { CustomHeader } from '../../components/CustomHeader';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { useApp } from '../../state/AppContext';
-import { openTurnByTurnNavigation } from '../../utils/navigationHelper';
+import { openTurnByTurnNavigation, safeGoBack } from '../../utils/navigationHelper';
 import { alertFeedbackService } from '../../services/alertFeedbackService';
 import { locationService } from '../../services/locationService';
 import { workerApiService } from '../../api/workerApiService';
@@ -158,7 +158,7 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
         title="Live Turn-by-Turn GPS"
         subtitle={`To ${job.customer.name}'s Location`}
         showBack
-        onBack={() => navigation.goBack()}
+        onBack={() => safeGoBack(navigation, 'ActiveJob', { jobId: job.id, job })}
       />
 
       {/* Turn-by-Turn Instruction Banner */}

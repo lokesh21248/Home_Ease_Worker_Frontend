@@ -16,6 +16,7 @@ export const API_ENDPOINTS = {
     WORKER_AVATAR: (workerId: string) => `/upload/worker-profile/${workerId}`,
     PAN_DOC: (workerId: string) => `/upload/worker-kyc/pan/${workerId}`,
     AADHAAR_DOC: (workerId: string) => `/upload/worker-kyc/aadhaar/${workerId}`,
+    JOB_PROOF: (bookingId: string) => `/upload/job-proof/${bookingId}`,
   },
 
   // 3. Worker KYC, Availability & Location
@@ -23,6 +24,7 @@ export const API_ENDPOINTS = {
     REGISTER_KYC: '/workers/register-kyc',
     STATUS: '/workers/status', // Online / Offline toggle
     LOCATION: '/workers/location', // GPS location heartbeat ping (Main backend)
+    STREAM_PING: '/workers/stream/ping', // High-frequency Redis GEO telemetry ping (Phase 3)
     EARNINGS: '/workers/earnings', // Earnings & Settlement summary
     PROFILE: '/workers/profile',
     UPDATE_PROFILE: '/workers/profile/update',
@@ -39,6 +41,7 @@ export const API_ENDPOINTS = {
   // 4. Job Dispatch, PIN Verification & Execution
   BOOKINGS: {
     ACCEPT: (bookingId: string) => `/workers/bookings/${bookingId}/accept`,
+    STREAM_ACCEPT: (bookingId: string) => `/workers/stream/bookings/${bookingId}/accept`,
     REJECT: (bookingId: string) => `/workers/bookings/${bookingId}/reject`,
     ON_THE_WAY: (bookingId: string) => `/workers/bookings/${bookingId}/on-the-way`,
     ARRIVE: (bookingId: string) => `/workers/bookings/${bookingId}/arrive`,

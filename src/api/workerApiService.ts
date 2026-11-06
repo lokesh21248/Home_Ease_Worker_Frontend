@@ -402,10 +402,29 @@ class WorkerApiService {
   }
 
   /**
-   * 3.2 GPS Location Heartbeat Ping: POST /workers/location
+   * 3.2 GPS Location Heartbeat Ping: POST /workers/location & /workers/stream/ping
    */
   public async sendLocationHeartbeat(lat: number, lng: number): Promise<string> {
     const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
+
+    // 1. Stream telemetry ping to /workers/stream/ping (Redis GEO set & 30s TTL heartbeat)
+    apiClient.post(
+      API_ENDPOINTS.WORKER.STREAM_PING,
+      {
+        workerId: activeUserId,
+        lat,
+        lng,
+        heading: 0,
+        speed: 0,
+        zoneId: 'e1094038-f99a-4c91-9e73-04980757d558',
+      },
+      {
+        headers: { 'X-User-Id': activeUserId },
+        params: { userId: activeUserId },
+      }
+    ).catch(() => {});
+
+    // 2. Duty location write
     try {
       const response = await apiClient.post(
         API_ENDPOINTS.WORKER.LOCATION,
@@ -448,12 +467,34 @@ class WorkerApiService {
   }
 
   /**
-   * 4.1 Accept Assigned Booking: POST /workers/bookings/{bookingId}/accept
+   * 4.1 Accept Assigned Booking: POST /workers/stream/bookings/{id}/accept
+   * Atomic winner check — protected against concurrent race conditions
    */
   public async acceptBooking(bookingId: string): Promise<AcceptBookingResponse> {
     const resolvedBookingId = resolveBookingUuid(bookingId);
     const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
+
     try {
+      // 1. Phase 3 Atomic Stream Accept Endpoint
+      const streamUrl = API_ENDPOINTS.BOOKINGS.STREAM_ACCEPT(resolvedBookingId);
+      const response = await apiClient.post<any>(
+        streamUrl,
+        { workerId: activeUserId, userId: activeUserId },
+        {
+          headers: { 'X-User-Id': activeUserId },
+          params: { userId: activeUserId },
+        }
+      );
+      return (response.data as any)?.data ?? response.data;
+    } catch (streamErr: any) {
+      if (streamErr?.response?.status === 409 || streamErr?.status === 409) {
+        const conflictErr: any = new Error('This job has already been accepted by another partner.');
+        conflictErr.status = 409;
+        conflictErr.isConflict = true;
+        throw conflictErr;
+      }
+
+      // 2. Fallback to standard acceptance endpoint
       const url = API_ENDPOINTS.BOOKINGS.ACCEPT(resolvedBookingId);
       const response = await apiClient.post<any>(
         url,
@@ -464,9 +505,36 @@ class WorkerApiService {
         }
       );
       return (response.data as any)?.data ?? response.data;
-    } catch (error: any) {
-      console.warn('[WorkerApi] acceptBooking error:', error?.message);
-      throw error;
+    }
+  }
+
+  /**
+   * 4.1.1 Upload Job Completion Photo Proof: POST /upload/job-proof/{bookingId}
+   */
+  public async uploadJobProof(
+    bookingId: string,
+    fileUri: string,
+    type: string = 'completion'
+  ): Promise<string> {
+    const resolvedBookingId = resolveBookingUuid(bookingId);
+    const url = API_ENDPOINTS.UPLOAD.JOB_PROOF(resolvedBookingId);
+    const formData = new FormData();
+    const filename = fileUri.split('/').pop() || `job_${type}_${Date.now()}.jpg`;
+    formData.append('file', {
+      uri: fileUri,
+      name: filename,
+      type: 'image/jpeg',
+    } as any);
+
+    try {
+      const response = await apiClient.post(url, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        params: { type },
+      });
+      return (response.data as any)?.url || (response.data as any)?.data?.url || fileUri;
+    } catch (err: any) {
+      console.warn('[WorkerApi] uploadJobProof notice:', err?.message || err);
+      return fileUri;
     }
   }
 

@@ -17,6 +17,7 @@ import { typography } from '../../theme/typography';
 import { CustomHeader } from '../../components/CustomHeader';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { useApp } from '../../state/AppContext';
+import { safeGoBack } from '../../utils/navigationHelper';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ServiceSelection'>;
 
@@ -47,7 +48,7 @@ export const ServiceSelectionScreen: React.FC<Props> = ({ navigation, route }) =
     if (isOnboarding) {
       navigation.navigate('AvailabilitySetup', { isOnboarding: true });
     } else {
-      navigation.goBack();
+      safeGoBack(navigation, 'MainTabs', { screen: 'ProfileTab' });
     }
   };
 
@@ -61,7 +62,13 @@ export const ServiceSelectionScreen: React.FC<Props> = ({ navigation, route }) =
             : 'Select categories to receive leads'
         }
         showBack
-        onBack={() => navigation.goBack()}
+        onBack={() =>
+          safeGoBack(
+            navigation,
+            isOnboarding ? 'DocumentUpload' : 'MainTabs',
+            isOnboarding ? { isOnboarding: true } : { screen: 'ProfileTab' }
+          )
+        }
       />
 
       {isOnboarding ? (
