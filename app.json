@@ -10,7 +10,10 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "UIBackgroundModes": ["location", "fetch"],
+        "UIBackgroundModes": [
+          "location",
+          "fetch"
+        ],
         "NSLocationWhenInUseUsageDescription": "HomeEase Partner requires your location to route service requests and provide turn-by-turn navigation.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "HomeEase Partner requires background location to show customers your live arrival progress while you travel to their doorstep."
       }
@@ -48,6 +51,12 @@
         }
       ],
       "expo-status-bar"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "4ce6ea30-68d3-4faa-bdc1-9eab3be77915"
+      }
+    },
+    "owner": "lokesh21248"
   }
 }
