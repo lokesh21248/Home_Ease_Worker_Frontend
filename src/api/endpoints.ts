@@ -1,5 +1,5 @@
-export const BASE_API_URL = 'http://3.107.161.126:8080/api/v1';
-export const BASE_TRACKING_URL = 'http://3.107.161.126:8082/api/v1';
+export const BASE_API_URL = 'http://3.108.55.219/api/v1';
+export const BASE_TRACKING_URL = 'http://3.108.55.219/api/v1';
 
 export const API_ENDPOINTS = {
   // 1. Worker Auth & Registration
@@ -29,6 +29,7 @@ export const API_ENDPOINTS = {
     PROFILE: '/workers/profile',
     UPDATE_PROFILE: '/workers/profile/update',
     SERVICES: '/services',
+    SERVICES_UPDATE: '/workers/services',
     SUB_SERVICES: (serviceId: string) => `/services/${serviceId}/sub-services`,
     BANK_DETAILS: '/workers/bank-details',
     AVAILABILITY: '/workers/availability',

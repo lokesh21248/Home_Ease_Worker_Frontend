@@ -367,15 +367,20 @@ class WorkerApiService {
   /**
    * 3.1 Toggle Duty (Go Online / Offline): POST /workers/status
    */
-  public async updateDutyStatus(isOnline: boolean): Promise<DutyStatusResponse> {
+  public async updateDutyStatus(isOnline: boolean, coords?: { lat: number; lng: number }): Promise<DutyStatusResponse> {
     const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
     try {
+      const payload: any = {
+        isOnline,
+        userId: activeUserId,
+      };
+      if (coords && coords.lat != null && coords.lng != null) {
+        payload.lat = coords.lat;
+        payload.lng = coords.lng;
+      }
       const response = await apiClient.post<any>(
         API_ENDPOINTS.WORKER.STATUS,
-        {
-          isOnline,
-          userId: activeUserId,
-        },
+        payload,
         {
           headers: {
             'X-User-Id': activeUserId,
@@ -398,6 +403,29 @@ class WorkerApiService {
         'Failed to update duty status.';
       console.warn('[WorkerApi] updateDutyStatus rejected by server:', errorMsg);
       throw error;
+    }
+  }
+
+  /**
+   * Update selected service skills: POST /workers/services
+   */
+  public async updateWorkerServices(serviceIds: string[]): Promise<any> {
+    const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
+    try {
+      const response = await apiClient.post<any>(
+        API_ENDPOINTS.WORKER.SERVICES_UPDATE,
+        {
+          userId: activeUserId,
+          serviceIds,
+        },
+        {
+          headers: { 'X-User-Id': activeUserId },
+          params: { userId: activeUserId },
+        }
+      );
+      return (response.data as any)?.data ?? response.data;
+    } catch (err: any) {
+      console.warn('[WorkerApi] updateWorkerServices error:', err?.message);
     }
   }
 
@@ -611,7 +639,7 @@ class WorkerApiService {
 
   /**
    * 5.1 Publish Live GPS Coordinate to Port 8082 Tracking Microservice:
-   * POST http://3.107.161.126:8082/api/v1/tracking/partner/location
+   * POST http://3.108.55.219/api/v1/tracking/partner/location
    */
   public async publishLiveLocation(
     bookingId: string,
@@ -816,8 +844,12 @@ class WorkerApiService {
   // ==========================================
 
   public async getWeeklyAvailability(): Promise<DaySchedule[]> {
+    const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
     try {
-      const response = await apiClient.get<any>(API_ENDPOINTS.WORKER.AVAILABILITY);
+      const response = await apiClient.get<any>(API_ENDPOINTS.WORKER.AVAILABILITY, {
+        headers: { 'X-User-Id': activeUserId },
+        params: { userId: activeUserId },
+      });
       const data = (response.data as any)?.data ?? response.data;
       return Array.isArray(data) ? data : [];
     } catch (error: any) {
@@ -836,8 +868,16 @@ class WorkerApiService {
   }
 
   public async saveWeeklyAvailability(schedule: DaySchedule[]): Promise<any> {
+    const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
     try {
-      const response = await apiClient.post(API_ENDPOINTS.WORKER.AVAILABILITY, { schedule });
+      const response = await apiClient.post(
+        API_ENDPOINTS.WORKER.AVAILABILITY,
+        { schedule, userId: activeUserId },
+        {
+          headers: { 'X-User-Id': activeUserId },
+          params: { userId: activeUserId },
+        }
+      );
       return (response.data as any)?.data ?? response.data;
     } catch (error: any) {
       return { success: true };
@@ -845,8 +885,12 @@ class WorkerApiService {
   }
 
   public async getTimeOff(): Promise<TimeOffItem[]> {
+    const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
     try {
-      const response = await apiClient.get<any>(API_ENDPOINTS.WORKER.TIME_OFF);
+      const response = await apiClient.get<any>(API_ENDPOINTS.WORKER.TIME_OFF, {
+        headers: { 'X-User-Id': activeUserId },
+        params: { userId: activeUserId },
+      });
       const data = (response.data as any)?.data ?? response.data;
       return Array.isArray(data) ? data : [];
     } catch (error: any) {
@@ -855,12 +899,21 @@ class WorkerApiService {
   }
 
   public async addTimeOff(startDate: string, endDate: string, reason?: string): Promise<any> {
+    const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
     try {
-      const response = await apiClient.post(API_ENDPOINTS.WORKER.TIME_OFF, {
-        startDate,
-        endDate,
-        reason,
-      });
+      const response = await apiClient.post(
+        API_ENDPOINTS.WORKER.TIME_OFF,
+        {
+          startDate,
+          endDate,
+          reason,
+          userId: activeUserId,
+        },
+        {
+          headers: { 'X-User-Id': activeUserId },
+          params: { userId: activeUserId },
+        }
+      );
       return (response.data as any)?.data ?? response.data;
     } catch (error: any) {
       return { success: true };
@@ -868,8 +921,12 @@ class WorkerApiService {
   }
 
   public async deleteTimeOff(id: string): Promise<any> {
+    const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
     try {
-      const response = await apiClient.delete(API_ENDPOINTS.WORKER.TIME_OFF_DETAIL(id));
+      const response = await apiClient.delete(API_ENDPOINTS.WORKER.TIME_OFF_DETAIL(id), {
+        headers: { 'X-User-Id': activeUserId },
+        params: { userId: activeUserId },
+      });
       return (response.data as any)?.data ?? response.data;
     } catch (error: any) {
       return { success: true };
@@ -877,8 +934,12 @@ class WorkerApiService {
   }
 
   public async getTodaySchedule(): Promise<WorkerTodaySchedule> {
+    const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
     try {
-      const response = await apiClient.get<any>(API_ENDPOINTS.WORKER.SCHEDULE_TODAY);
+      const response = await apiClient.get<any>(API_ENDPOINTS.WORKER.SCHEDULE_TODAY, {
+        headers: { 'X-User-Id': activeUserId },
+        params: { userId: activeUserId },
+      });
       const data = (response.data as any)?.data ?? response.data;
       return {
         date: data?.date || new Date().toISOString().split('T')[0],
@@ -897,8 +958,12 @@ class WorkerApiService {
   }
 
   public async getUpcomingSchedule(): Promise<WorkerScheduleSlot[]> {
+    const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
     try {
-      const response = await apiClient.get<any>(API_ENDPOINTS.WORKER.SCHEDULE_UPCOMING);
+      const response = await apiClient.get<any>(API_ENDPOINTS.WORKER.SCHEDULE_UPCOMING, {
+        headers: { 'X-User-Id': activeUserId },
+        params: { userId: activeUserId },
+      });
       const data = (response.data as any)?.data ?? response.data;
       return Array.isArray(data) ? data : [];
     } catch (error: any) {

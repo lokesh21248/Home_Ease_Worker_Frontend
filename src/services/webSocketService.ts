@@ -1,15 +1,15 @@
 import { BASE_API_URL } from '../api/endpoints';
 
-// Derive WebSocket URL from BASE_API_URL: e.g. http://3.107.161.126:8080/api/v1 -> ws://3.107.161.126:8080/ws/websocket
-// Spring SockJS registers /ws endpoint; raw WebSocket transport is available at /ws/websocket
+// Derive WebSocket URL from BASE_API_URL: e.g. http://3.108.55.219/api/v1 -> ws://3.108.55.219/worker/stream/websocket
+// Spring core registers /worker/stream endpoint; raw WebSocket transport is available at /worker/stream/websocket
 const getWebSocketUrl = (): string => {
   try {
     const url = new URL(BASE_API_URL);
     const wsProto = url.protocol === 'https:' ? 'wss:' : 'ws:';
-    // SockJS raw WebSocket transport endpoint (bypasses SockJS negotiation for React Native)
-    return `${wsProto}//${url.host}/ws/websocket`;
+    // Core WebSocket broker endpoint for worker job dispatch
+    return `${wsProto}//${url.host}/worker/stream/websocket`;
   } catch {
-    return 'ws://3.107.161.126:8080/ws/websocket';
+    return 'ws://3.108.55.219/worker/stream/websocket';
   }
 };
 

@@ -376,9 +376,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setWorker(authSession.workerProfile);
           }
           // Fetch live worker profile from backend GET /workers/profile
-          fetchWorkerProfile().catch(() => {});
-        } else if (worker?.id) {
-          apiClient.setUserId(worker.id);
+          await fetchWorkerProfile().catch(() => {});
+        } else {
+          const defaultUid = worker?.userId || worker?.id || '1270d52d-9f4e-4399-9a80-15cab07f1763';
+          apiClient.setUserId(defaultUid);
+          await fetchWorkerProfile().catch(() => {});
         }
 
         const cachedJob = await storageService.loadActiveJob();
@@ -394,13 +396,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       } catch (err) {
         console.warn('[AppContext] Error restoring persisted state:', err);
+      } finally {
+        fetchServicesCatalog();
+        fetchAvailabilityData();
+        fetchSchedules();
+        fcmService.getFCMToken().catch(() => {});
       }
     };
     restorePersistedState();
-    fetchServicesCatalog();
-    fetchAvailabilityData();
-    fetchSchedules();
-    fcmService.getFCMToken().catch(() => {});
 
     // Initialize current location silently
     locationService.getCurrentLocation().then((loc) => {
@@ -501,6 +504,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const updated = exists
         ? prev.selectedServices.filter((id) => id !== serviceId)
         : [...prev.selectedServices, serviceId];
+      workerApiService.updateWorkerServices(updated).catch(() => {});
       return { ...prev, selectedServices: updated };
     });
   };
@@ -557,7 +561,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // End-to-end Backend Duty Toggle (POST /workers/status)
     try {
-      const res = await workerApiService.updateDutyStatus(nextStatus);
+      let coords: { lat: number; lng: number } | undefined = undefined;
+      try {
+        const freshLoc = await locationService.getCurrentLocation();
+        if (freshLoc && freshLoc.latitude && freshLoc.longitude) {
+          coords = { lat: freshLoc.latitude, lng: freshLoc.longitude };
+          setLocationData(freshLoc);
+        }
+      } catch (locErr) {
+        if (locationData && locationData.latitude && locationData.longitude) {
+          coords = { lat: locationData.latitude, lng: locationData.longitude };
+        }
+      }
+      const res = await workerApiService.updateDutyStatus(nextStatus, coords);
       const updatedOnline = res?.isOnline !== undefined ? res.isOnline : nextStatus;
       setWorker((prev) => ({
         ...prev,

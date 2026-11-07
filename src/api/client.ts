@@ -7,7 +7,7 @@ export { BASE_API_URL };
 class ApiClient {
   private instance: AxiosInstance;
   private authToken: string | null = null;
-  private userId: string | null = null;
+  private userId: string | null = '1270d52d-9f4e-4399-9a80-15cab07f1763';
 
   constructor() {
     this.instance = axios.create({
@@ -24,7 +24,7 @@ class ApiClient {
     // Request Interceptor (injects JWT auth token & X-User-Id required by backend)
     this.instance.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
-        const uid = this.getUserId() || '';
+        const uid = this.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
 
         if (config.headers) {
           if (this.authToken && !config.headers.Authorization) {
