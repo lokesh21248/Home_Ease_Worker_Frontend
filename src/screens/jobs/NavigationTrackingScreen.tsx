@@ -21,9 +21,10 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { useApp } from '../../state/AppContext';
 import { openTurnByTurnNavigation, safeGoBack } from '../../utils/navigationHelper';
 import { alertFeedbackService } from '../../services/alertFeedbackService';
-import { locationService } from '../../services/locationService';
+import { locationService, LocationData } from '../../services/locationService';
 import { workerApiService } from '../../api/workerApiService';
 import { resolveBookingUuid } from '../../utils/uuid';
+import { PartnerGoogleMapView, PartnerGoogleMapHandle } from '../../components/map/PartnerGoogleMapView';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'NavigationTracking'>;
 
@@ -38,6 +39,12 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
   const { job } = route.params;
   const { updateJobStatus } = useApp();
   const bookingId = resolveBookingUuid(job.bookingId, job.id);
+
+  const mapRef = useRef<PartnerGoogleMapHandle | null>(null);
+  const [currentLocation, setCurrentLocation] = useState<LocationData | null>(null);
+  const [routeCoordinates, setRouteCoordinates] = useState<[number, number][]>([]);
+  const [trafficEnabled, setTrafficEnabled] = useState(false);
+  const hasFetchedInitialRoute = useRef(false);
 
   const [etaMins, setEtaMins] = useState(8);
   const [distanceKm, setDistanceKm] = useState(job.location.distanceKm || 1.8);
@@ -70,6 +77,8 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
       try {
         const loc = await locationService.getCurrentLocation();
         if (loc && isMounted) {
+          setCurrentLocation(loc);
+
           // 1. Broadcast real GPS coordinates to Port 8082 tracking service with bearing, speed & accuracy
           await workerApiService.publishLiveLocation(
             bookingId,
@@ -90,6 +99,20 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
             if (distanceData && isMounted) {
               setDistanceKm(distanceData.distanceKm);
               setEtaMins(distanceData.etaMinutes);
+            }
+
+            // 3. Fetch driving route polyline once on initial fix or when missing
+            if (!hasFetchedInitialRoute.current && isMounted) {
+              hasFetchedInitialRoute.current = true;
+              const routeData = await workerApiService.getDrivingRoute(
+                loc.latitude,
+                loc.longitude,
+                job.location.latitude,
+                job.location.longitude
+              );
+              if (routeData?.coordinates && isMounted) {
+                setRouteCoordinates(routeData.coordinates);
+              }
             }
           }
         }
@@ -176,50 +199,40 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
         </View>
       </View>
 
-      {/* Vector / Styled Map Simulation Area */}
+      {/* Google Maps Realtime Tracking Area */}
       <View style={styles.mapArea}>
-        <View style={styles.mapGridHorizontal1} />
-        <View style={styles.mapGridHorizontal2} />
-        <View style={styles.mapGridVertical1} />
-        <View style={styles.mapGridVertical2} />
-
-        {/* Map Road Route SVG-like Styled Path */}
-        <View style={styles.routeContainer}>
-          {/* Worker Start Pin */}
-          <View style={styles.workerPin}>
-            <View style={styles.workerPulseCircle} />
-            <Ionicons name="bicycle-outline" size={18} color="#FFFFFF" />
-          </View>
-
-          {/* S-curve dashed route simulation */}
-          <View style={styles.roadTrack}>
-            <View style={styles.roadProgressTrack} />
-          </View>
-
-          {/* Destination Customer Pin */}
-          <View style={styles.destinationPin}>
-            <Ionicons name="location" size={26} color={colors.primary} />
-            <View style={styles.destBadge}>
-              <Text style={styles.destBadgeText}>Customer Address</Text>
-            </View>
-          </View>
-        </View>
+        <PartnerGoogleMapView
+          ref={mapRef}
+          workerLat={currentLocation?.latitude}
+          workerLng={currentLocation?.longitude}
+          workerHeading={currentLocation?.heading}
+          customerLat={job.location.latitude}
+          customerLng={job.location.longitude}
+          customerAddress={job.location.address}
+          customerName={job.customer.name}
+          routeCoordinates={routeCoordinates}
+          trafficEnabled={trafficEnabled}
+        />
 
         {/* Map Overlay Controls */}
         <View style={styles.mapControls}>
           <TouchableOpacity
             style={styles.mapBtn}
             activeOpacity={0.8}
-            onPress={() => Alert.alert('Recenter', 'Map centered to worker GPS location.')}
+            onPress={() => mapRef.current?.recenterToWorker()}
           >
             <Ionicons name="locate-outline" size={20} color={colors.primary} />
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.mapBtn}
+            style={[styles.mapBtn, trafficEnabled && styles.mapBtnActive]}
             activeOpacity={0.8}
-            onPress={() => Alert.alert('Traffic Layer', 'Live traffic enabled.')}
+            onPress={() => setTrafficEnabled((prev) => !prev)}
           >
-            <Ionicons name="layers-outline" size={20} color={colors.textPrimary} />
+            <Ionicons
+              name="layers-outline"
+              size={20}
+              color={trafficEnabled ? colors.primary : colors.textPrimary}
+            />
           </TouchableOpacity>
         </View>
 
@@ -553,6 +566,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     ...shadows.sm,
+  },
+  mapBtnActive: {
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
   },
   etaFloatingBar: {
     position: 'absolute',

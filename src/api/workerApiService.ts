@@ -715,6 +715,41 @@ class WorkerApiService {
   }
 
   /**
+   * 5.3 Fetch Driving Route polyline between Partner GPS and Customer destination
+   * GET /api/v1/tracking/route?startLat=...&startLng=...&destLat=...&destLng=...
+   */
+  public async getDrivingRoute(
+    startLat: number,
+    startLng: number,
+    destLat: number,
+    destLng: number
+  ): Promise<{ coordinates: [number, number][]; distanceText?: string; durationText?: string } | null> {
+    try {
+      const url = `${BASE_TRACKING_URL}${API_ENDPOINTS.TRACKING.ROUTE}`;
+      const response = await axios.get(url, {
+        params: {
+          startLat,
+          startLng,
+          destLat,
+          destLng,
+        },
+        timeout: 6000,
+      });
+      const data = response.data;
+      if (data && data.found && Array.isArray(data.coordinates)) {
+        return {
+          coordinates: data.coordinates,
+          distanceText: data.distanceText,
+          durationText: data.durationText,
+        };
+      }
+    } catch (err: any) {
+      // non-critical fallback
+    }
+    return null;
+  }
+
+  /**
    * 4.3 Verify Customer PIN & Start Work: POST /workers/bookings/{bookingId}/verify-pin
    */
   public async verifyBookingPin(
