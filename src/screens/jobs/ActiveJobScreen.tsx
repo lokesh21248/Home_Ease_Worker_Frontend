@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Alert,
   Modal,
   TextInput,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -53,6 +54,20 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
   const [isPinModalOpen, setIsPinModalOpen] = useState<boolean>(false);
   const [pinDigits, setPinDigits] = useState<string[]>(['', '', '', '']);
   const [pinError, setPinError] = useState<string>('');
+  const pinRefs = useRef<React.ElementRef<typeof TextInput>[]>([]);
+  const pinShakeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (pinError && pinError.toLowerCase().includes('pin')) {
+      Animated.sequence([
+        Animated.timing(pinShakeAnim, { toValue: 10, duration: 60, useNativeDriver: true }),
+        Animated.timing(pinShakeAnim, { toValue: -10, duration: 60, useNativeDriver: true }),
+        Animated.timing(pinShakeAnim, { toValue: 8, duration: 50, useNativeDriver: true }),
+        Animated.timing(pinShakeAnim, { toValue: -8, duration: 50, useNativeDriver: true }),
+        Animated.timing(pinShakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [pinError]);
 
   // Extra Sub-Service Upsell Modal
   const [isUpsellModalOpen, setIsUpsellModalOpen] = useState<boolean>(false);
@@ -97,7 +112,10 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const handleStartJob = () => {
     setPinError('');
+    setPinDigits(['', '', '', '']);
     setIsPinModalOpen(true);
+    // Auto-focus first digit after modal opens
+    setTimeout(() => { pinRefs.current[0]?.focus(); }, 300);
   };
 
   const handleVerifyPinSubmit = async () => {
@@ -450,7 +468,9 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
             </Text>
 
             {/* 4 PIN Digit Boxes */}
-            <View style={styles.pinBoxesRow}>
+            <Animated.View
+              style={[styles.pinBoxesRow, { transform: [{ translateX: pinShakeAnim }] }]}
+            >
               {pinDigits.map((d, i) => (
                 <TextInput
                   key={i}
@@ -465,14 +485,20 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
                     updated[i] = val.slice(-1);
                     setPinDigits(updated);
                     if (pinError) setPinError('');
+                    // Auto-advance to next box
+                    if (val.length > 0 && i < 3) {
+                      pinRefs.current[i + 1]?.focus();
+                    }
                   }}
                   keyboardType="number-pad"
                   maxLength={1}
                   textAlign="center"
                   selectTextOnFocus
+                  ref={(r) => { if (r) pinRefs.current[i] = r; }}
+                  autoFocus={i === 0}
                 />
               ))}
-            </View>
+            </Animated.View>
 
             {pinError ? (
               <Text style={styles.pinErrorText}>{pinError}</Text>
@@ -498,7 +524,11 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
               size="md"
               fullWidth
               variant="subtle"
-              onPress={() => setIsPinModalOpen(false)}
+              onPress={() => {
+                setIsPinModalOpen(false);
+                setPinDigits(['', '', '', '']);
+                setPinError('');
+              }}
               style={{ marginTop: spacing.xs }}
             />
           </View>

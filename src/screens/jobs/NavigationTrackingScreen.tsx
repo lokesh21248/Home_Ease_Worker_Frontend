@@ -257,8 +257,13 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
           </View>
           <View style={styles.etaDivider} />
           <View style={styles.arrivalCol}>
-            <Text style={styles.arrivalLabel}>Target Arrival</Text>
-            <Text style={styles.arrivalValue}>{job.scheduledTime}</Text>
+            <Text style={styles.arrivalLabel}>Est. Arrival</Text>
+            <Text style={styles.arrivalValue}>
+              {new Date(Date.now() + etaMins * 60 * 1000).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </Text>
           </View>
         </View>
       </View>
@@ -266,6 +271,13 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
       {/* Bottom Sheet Card */}
       <View style={styles.bottomCard}>
         <View style={styles.dragPill} />
+
+        <View style={styles.statusPillRow}>
+          <View style={[styles.statusPill, { backgroundColor: '#EFF6FF' }]}>
+            <View style={styles.statusPillDot} />
+            <Text style={styles.statusPillText}>En Route · GPS Active</Text>
+          </View>
+        </View>
 
         <View style={styles.customerRow}>
           <Image
@@ -334,7 +346,7 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
         </View>
 
         <PrimaryButton
-          title={isArriving ? "Confirming Arrival..." : "I Have Arrived at Location"}
+          title={isArriving ? "Confirming Arrival..." : "✓  I Have Arrived — Notify Customer"}
           size="lg"
           fullWidth
           loading={isArriving}
@@ -760,6 +772,31 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  statusPillRow: {
+    flexDirection: 'row',
+    marginBottom: 10,
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    gap: 5,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  statusPillDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#2563EB',
+  },
+  statusPillText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#1D4ED8',
   },
 });
 
