@@ -73,21 +73,30 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
     // Immediately trigger ON_THE_WAY on backend
     workerApiService.startTravelling(bookingId).catch(() => {});
 
+    let interval: any = null;
+
     const streamGpsLocation = async () => {
       try {
-        const loc = await locationService.getCurrentLocation();
+        const loc = await locationService.getCurrentLocation(true);
         if (loc && isMounted) {
           setCurrentLocation(loc);
 
-          // 1. Broadcast real GPS coordinates to Port 8082 tracking service with bearing, speed & accuracy
-          await workerApiService.publishLiveLocation(
+          // 1. Broadcast real GPS coordinates to Port 8082 tracking service with bearing, speed, accuracy & timestamp
+          const trackRes = await workerApiService.publishLiveLocation(
             bookingId,
             loc.latitude,
             loc.longitude,
             loc.heading ?? 0,
             loc.speed ?? 0,
-            loc.accuracy ?? 5.0
+            loc.accuracy ?? 5.0,
+            Date.now()
           );
+
+          // If tracking was closed on backend (e.g. COMPLETED or CANCELLED), stop interval
+          if (trackRes?.trackingActive === false || trackRes?.status === 'INACTIVE') {
+            if (interval) clearInterval(interval);
+            return;
+          }
 
           // 2. Query live road distance and ETA
           if (job.location.latitude && job.location.longitude) {
@@ -125,7 +134,7 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
     streamGpsLocation();
 
     // Repeat every 5 seconds while on this screen
-    const interval = setInterval(streamGpsLocation, 5000);
+    interval = setInterval(streamGpsLocation, 5000);
 
     return () => {
       isMounted = false;
@@ -194,7 +203,11 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
           <Text style={styles.turnInstruction}>Turn left onto Main Road</Text>
         </View>
         <View style={styles.speedPill}>
-          <Text style={styles.speedText}>32</Text>
+          <Text style={styles.speedText}>
+            {currentLocation?.speed && currentLocation.speed > 0
+              ? Math.round(currentLocation.speed * 3.6)
+              : 0}
+          </Text>
           <Text style={styles.speedUnit}>km/h</Text>
         </View>
       </View>
