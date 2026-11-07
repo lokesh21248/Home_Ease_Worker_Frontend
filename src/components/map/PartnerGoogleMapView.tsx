@@ -229,6 +229,7 @@ export const PartnerGoogleMapView = forwardRef<PartnerGoogleMapHandle, PartnerGo
               anchor={{ x: 0.5, y: 0.9 }}
               title={customerName}
               description={customerAddress}
+              tracksViewChanges={false}
             >
               <View style={styles.destMarkerWrapper}>
                 <View style={styles.destBadge}>
@@ -255,6 +256,7 @@ export const PartnerGoogleMapView = forwardRef<PartnerGoogleMapHandle, PartnerGo
               flat={true}
               rotation={workerHeading ?? 0}
               title="Your Location"
+              tracksViewChanges={false}
             >
               <View style={styles.workerMarkerContainer}>
                 <Animated.View
