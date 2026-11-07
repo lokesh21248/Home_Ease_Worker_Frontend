@@ -40,3 +40,4 @@ export function toGoogleMapCoordinates(
     })
     .filter((c) => isValidCoordinate(c.latitude, c.longitude));
 }
+
