@@ -135,6 +135,7 @@ export const mockInitialWorker: WorkerProfile = {
   isKycVerified: true,
   isVerified: true,
   selectedServices: [],
+  workingPincodes: ['500081', '500072', '500032', '500033', '500034', '500104'],
   availability: {
     days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
     startHour: '08:00 AM',

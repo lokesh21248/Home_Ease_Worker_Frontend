@@ -407,17 +407,29 @@ class WorkerApiService {
   }
 
   /**
-   * Update selected service skills: POST /workers/services
+   * Update selected service skills and working pincodes: POST /workers/services
    */
-  public async updateWorkerServices(serviceIds: string[]): Promise<any> {
+  public async updateWorkerServices(
+    serviceIds?: string[],
+    subServiceIds?: string[],
+    workingPincodes?: string[] | string
+  ): Promise<any> {
     const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
     try {
+      const payload: any = {
+        userId: activeUserId,
+      };
+      if (serviceIds) payload.serviceIds = serviceIds;
+      if (subServiceIds) payload.subServiceIds = subServiceIds;
+      if (workingPincodes !== undefined) {
+        payload.workingPincodes = Array.isArray(workingPincodes)
+          ? workingPincodes.join(', ')
+          : workingPincodes;
+      }
+
       const response = await apiClient.post<any>(
         API_ENDPOINTS.WORKER.SERVICES_UPDATE,
-        {
-          userId: activeUserId,
-          serviceIds,
-        },
+        payload,
         {
           headers: { 'X-User-Id': activeUserId },
           params: { userId: activeUserId },
@@ -426,6 +438,7 @@ class WorkerApiService {
       return (response.data as any)?.data ?? response.data;
     } catch (err: any) {
       console.warn('[WorkerApi] updateWorkerServices error:', err?.message);
+      throw err;
     }
   }
 

@@ -41,6 +41,8 @@ interface AppContextType {
 
   // Services & Availability
   services: ServiceCategory[];
+  workingPincodes: string[];
+  updateWorkingPincodes: (pincodes: string[]) => Promise<boolean>;
   toggleServiceSelection: (serviceId: string) => void;
   updateAvailability: (availability: WorkerProfile['availability']) => void;
   toggleOnlineStatus: () => Promise<void> | void;
@@ -132,6 +134,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Session State
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
   const [worker, setWorker] = useState<WorkerProfile>(mockInitialWorker);
+  const [workingPincodes, setWorkingPincodes] = useState<string[]>(
+    mockInitialWorker.workingPincodes || ['500081', '500072', '500032', '500033', '500034', '500104']
+  );
 
   // Services & Documents
   const [services, setServices] = useState<ServiceCategory[]>(mockServices);
@@ -281,7 +286,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             ...prev.availability,
             isOnline: profile.isOnline ?? prev.availability.isOnline,
           },
+          workingPincodes: profile.workingPincodes
+            ? (profile.workingPincodes as string).split(',').map((s: string) => s.trim()).filter(Boolean)
+            : prev.workingPincodes,
         }));
+
+        if (profile.workingPincodes) {
+          const codes = (profile.workingPincodes as string)
+            .split(',')
+            .map((s: string) => s.trim())
+            .filter(Boolean);
+          if (codes.length > 0) {
+            setWorkingPincodes(codes);
+          }
+        }
 
         if (profile.userId) {
           apiClient.setUserId(profile.userId);
@@ -511,6 +529,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateAvailability = (availability: WorkerProfile['availability']) => {
     setWorker((prev) => ({ ...prev, availability }));
+  };
+
+  const updateWorkingPincodes = async (pincodes: string[]): Promise<boolean> => {
+    try {
+      const cleaned = pincodes
+        .map((p) => p.trim())
+        .filter((p) => /^\d{6}$/.test(p));
+      await workerApiService.updateWorkerServices(undefined, undefined, cleaned);
+      setWorkingPincodes(cleaned);
+      setWorker((prev) => ({
+        ...prev,
+        workingPincodes: cleaned,
+      }));
+      return true;
+    } catch (err: any) {
+      console.warn('[AppContext] updateWorkingPincodes failed:', err?.message);
+      return false;
+    }
   };
 
   const toggleOnlineStatus = async () => {
@@ -1263,6 +1299,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateWorkerProfile,
         logout,
         services,
+        workingPincodes,
+        updateWorkingPincodes,
         toggleServiceSelection,
         updateAvailability,
         toggleOnlineStatus,

@@ -76,6 +76,7 @@ export interface WorkerProfile {
   isKycVerified: boolean;
   isVerified?: boolean; // alias for backend isVerified
   selectedServices: string[]; // service category IDs
+  workingPincodes?: string[]; // Preferred 6-digit service pincodes for dispatch matching
   availability: WorkerAvailability;
 }
 
