@@ -126,3 +126,4 @@ class WorkerTrackingLifecycleManager {
 }
 
 export const workerTrackingLifecycle = WorkerTrackingLifecycleManager.getInstance();
+
