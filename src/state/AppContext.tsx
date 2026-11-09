@@ -27,6 +27,7 @@ import { alertFeedbackService } from '../services/alertFeedbackService';
 import { resolveBookingUuid } from '../utils/uuid';
 import { mapBackendBookingToJob } from '../utils/bookingMapper';
 import { locationService, LocationData, GpsStatus } from '../services/locationService';
+import { workerTrackingLifecycle } from '../services/TrackingLifecycleManager';
 import { webSocketService } from '../services/webSocketService';
 import { Alert } from 'react-native';
 
@@ -996,6 +997,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       alertFeedbackService.playSuccessFeedback();
+      workerTrackingLifecycle.stopTracking(activeBookingId);
       setActiveBannerAlert('Job started successfully!');
       return { success: true, message: 'Job started successfully!', data: res };
     } catch (err: any) {
@@ -1103,7 +1105,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (newStatus === 'travelling') {
       workerApiService.startTravelling(bId).catch((e) => console.warn('[AppContext] startTravelling:', e?.message));
     } else if (newStatus === 'arrived') {
+      workerTrackingLifecycle.stopTracking(bId);
       workerApiService.arriveAtCustomer(bId).catch((e) => console.warn('[AppContext] arriveAtCustomer:', e?.message));
+    } else if (newStatus === 'started' || newStatus === 'completed') {
+      workerTrackingLifecycle.stopTracking(bId);
     }
   };
 
@@ -1117,6 +1122,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const bId = resolveBookingUuid(activeJob.bookingId, activeJob.id);
+    workerTrackingLifecycle.stopTracking(bId);
 
     // End-to-end Backend Job Complete (POST /workers/bookings/{bookingId}/complete)
     try {

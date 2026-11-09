@@ -23,6 +23,7 @@ import { openTurnByTurnNavigation, safeGoBack } from '../../utils/navigationHelp
 import { alertFeedbackService } from '../../services/alertFeedbackService';
 import { locationService, LocationData } from '../../services/locationService';
 import { workerApiService } from '../../api/workerApiService';
+import { workerTrackingLifecycle } from '../../services/TrackingLifecycleManager';
 import { resolveBookingUuid } from '../../utils/uuid';
 import { PartnerGoogleMapView, PartnerGoogleMapHandle } from '../../components/map/PartnerGoogleMapView';
 
@@ -66,79 +67,49 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
     },
   ]);
 
-  // Live GPS broadcast loop (every 5 seconds) to port 8082 tracking microservice
+  // Live GPS broadcast loop (every 3-5s adaptive) to tracking service
   useEffect(() => {
     let isMounted = true;
 
-    // Immediately trigger ON_THE_WAY on backend
+    // Trigger ON_THE_WAY on backend
     workerApiService.startTravelling(bookingId).catch(() => {});
 
-    let interval: any = null;
+    // Start travel tracking lifecycle
+    workerTrackingLifecycle.startTravelTracking(
+      bookingId,
+      (loc) => {
+        if (!isMounted) return;
+        setCurrentLocation(loc);
 
-    const streamGpsLocation = async () => {
-      try {
-        const loc = await locationService.getCurrentLocation(true);
-        if (loc && isMounted) {
-          setCurrentLocation(loc);
-
-          // 1. Broadcast real GPS coordinates to Port 8082 tracking service with bearing, speed, accuracy & timestamp
-          const trackRes = await workerApiService.publishLiveLocation(
-            bookingId,
-            loc.latitude,
-            loc.longitude,
-            loc.heading ?? 0,
-            loc.speed ?? 0,
-            loc.accuracy ?? 5.0,
-            Date.now()
-          );
-
-          // If tracking was closed on backend (e.g. COMPLETED or CANCELLED), stop interval
-          if (trackRes?.trackingActive === false || trackRes?.status === 'INACTIVE') {
-            if (interval) clearInterval(interval);
-            return;
-          }
-
-          // 2. Query live road distance and ETA
-          if (job.location.latitude && job.location.longitude) {
-            const distanceData = await workerApiService.getLiveDistanceAndEta(
-              bookingId,
+        // Fetch driving route polyline once on initial fix
+        if (!hasFetchedInitialRoute.current && job.location.latitude && job.location.longitude) {
+          hasFetchedInitialRoute.current = true;
+          workerApiService
+            .getDrivingRoute(
+              loc.latitude,
+              loc.longitude,
               job.location.latitude,
               job.location.longitude
-            );
-            if (distanceData && isMounted) {
-              setDistanceKm(distanceData.distanceKm);
-              setEtaMins(distanceData.etaMinutes);
-            }
-
-            // 3. Fetch driving route polyline once on initial fix or when missing
-            if (!hasFetchedInitialRoute.current && isMounted) {
-              hasFetchedInitialRoute.current = true;
-              const routeData = await workerApiService.getDrivingRoute(
-                loc.latitude,
-                loc.longitude,
-                job.location.latitude,
-                job.location.longitude
-              );
+            )
+            .then((routeData) => {
               if (routeData?.coordinates && isMounted) {
                 setRouteCoordinates(routeData.coordinates);
               }
-            }
-          }
+            })
+            .catch(() => {});
         }
-      } catch (err: any) {
-        console.warn('[NavigationTrackingScreen] GPS stream notice:', err?.message);
-      }
-    };
-
-    // Run immediately on screen open
-    streamGpsLocation();
-
-    // Repeat every 5 seconds while on this screen
-    interval = setInterval(streamGpsLocation, 5000);
+      },
+      (distanceData) => {
+        if (!isMounted) return;
+        setDistanceKm(distanceData.distanceKm);
+        setEtaMins(distanceData.etaMinutes);
+      },
+      { latitude: job.location.latitude, longitude: job.location.longitude }
+    );
 
     return () => {
       isMounted = false;
-      clearInterval(interval);
+      workerTrackingLifecycle.stopTracking(bookingId);
     };
   }, [bookingId, job.location.latitude, job.location.longitude]);
 
@@ -169,11 +140,14 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
   const handleArrived = async () => {
     if (isArriving) return;
     setIsArriving(true);
+
+    // CRITICAL: Immediately stop booking travel GPS collection and uploads
+    workerTrackingLifecycle.stopTracking(bookingId);
     alertFeedbackService.playSuccessFeedback();
 
     try {
       // 1. Sync Arrival with Backend Monolith (POST /workers/bookings/{id}/arrive)
-      // This atomically updates booking status to ARRIVED and generates the service start OTP
+      // This atomically updates booking status to ARRIVED, marks session ARRIVED, and generates the service start OTP
       await workerApiService.arriveAtCustomer(bookingId);
     } catch (err: any) {
       console.warn('[NavigationTrackingScreen] arriveAtCustomer backend sync:', err?.message);
