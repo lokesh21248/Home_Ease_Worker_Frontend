@@ -107,7 +107,7 @@ export const mapBackendBookingToJob = (item: any): Job => {
     commission,
     netPayout,
     status: mappedStatus,
-    pinCode: item.pinCode || '',
+    pinCode: undefined, // Never exposed to worker frontend; worker must obtain it manually from customer
     subServices: item.subServices || [],
     instructions: item.instructions || item.cancellationReason || '',
     paymentMode: item.paymentMethod || item.paymentMode || 'Online Payment',

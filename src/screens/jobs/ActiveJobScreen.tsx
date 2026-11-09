@@ -506,7 +506,7 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
               <View style={styles.demoPinNotice}>
                 <Ionicons name="shield-checkmark-outline" size={14} color={colors.primary} />
                 <Text style={styles.demoPinNoticeText}>
-                  Customer Security PIN: {currentJob.pinCode || '4821'}
+                  Ask the customer for the 4-digit Service Start PIN shown on their HomeEase tracking screen.
                 </Text>
               </View>
             )}
