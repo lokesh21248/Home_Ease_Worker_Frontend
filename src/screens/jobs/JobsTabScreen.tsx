@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tabBadgeActive: {
-    backgroundColor: colors.secondary,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
   },
   tabBadgeInactive: {
     backgroundColor: colors.primaryLight,

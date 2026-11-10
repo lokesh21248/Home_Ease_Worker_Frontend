@@ -1,62 +1,67 @@
 /**
- * HomeEase Partner - Complete Pronto & Urban Company Theme Palette
- * Brand Guidelines:
- * Primary: #1769E0 (HomeEase Blue)
- * Background: #FFFFFF
- * Secondary Background: #F5F8FC
- * Text: Dark Navy (#0F1E36)
- * Cards: #FFFFFF with subtle borders (#E5EAF2)
+ * HomeEase Partner Design System Theme Palette
+ * Specification:
+ * Primary: #0052FF (HomeEase Blue)
+ * Secondary: #EAF1FF (Soft Blue Surface)
+ * Background: #F4F7FC (Premium App Canvas)
+ * Cards: #FFFFFF (White Surfaces)
+ * Text: #101B35 (Deep Navy Text)
+ * Secondary Text: #718096 (Muted Slate)
+ * Borders: #E6EBF3 (Subtle Borders)
+ * Success: #10B981, SuccessLight: #E6F9F0
+ * Error: #EF4444, ErrorLight: #FEE2E2
+ * Warning: #F59E0B, WarningLight: #FEF3C7
  */
 
 export const colors = {
   // Brand Blue System
-  primary: '#1769E0',         // Primary Blue
-  primaryDark: '#0F4BB8',     // Rich Deep Blue
-  secondary: '#0E3378',       // Dark Navy Blue (Headers, contrast accents)
-  primaryLight: '#3D87F5',    // Lighter Blue (Highlights, focused elements)
-  primarySoft: '#EBF3FE',     // Ultra Soft Blue (Card accents, active pill backgrounds)
-  primaryLighter: '#F5F8FC',  // Secondary Background tint
+  primary: '#0052FF',         // Primary Action Blue
+  primaryDark: '#003ECC',     // Rich Deep Blue
+  primaryLight: '#3374FF',    // Lighter Accent Blue
+  primarySoft: '#EAF1FF',     // Soft Blue Container / Pill background
+  primaryLighter: '#F4F7FC',  // Canvas Background
+  secondary: '#EAF1FF',       // Secondary Surface / Accents
 
   // Neutral Backgrounds & Cards
-  background: '#FFFFFF',      // Clean Premium App Background
-  secondaryBackground: '#F5F8FC', // Secondary Background
+  background: '#F4F7FC',      // Premium Minimal Background Canvas
+  secondaryBackground: '#EAEFF8', // Secondary Background tint
   surface: '#FFFFFF',         // Card & Sheet Background
-  card: '#FFFFFF',            // Explicit Card alias
-  surfaceAlt: '#F5F8FC',      // Input & Pill secondary background
+  card: '#FFFFFF',            // Explicit Card Surface
+  surfaceAlt: '#F4F7FC',      // Input & Pill secondary background
   surfaceElevated: '#FFFFFF',
 
   // Typography
-  textPrimary: '#0F1E36',     // Primary Text (Dark Navy)
-  textSecondary: '#6B7A90',   // Secondary Text (Muted subtitle / caption)
-  textMuted: '#9BA8B8',       // Inactive icons & placeholders
+  textPrimary: '#101B35',     // Primary Text (Deep Navy)
+  textSecondary: '#718096',   // Secondary Text (Slate / Muted caption)
+  textMuted: '#A0AEC0',       // Inactive icons & placeholders
   textInverse: '#FFFFFF',     // White text on dark/blue buttons
-  textPrimaryBlue: '#1769E0', // Blue accented text
+  textPrimaryBlue: '#0052FF', // Blue accented text
 
   // Borders & Dividers
-  border: '#E5EAF2',          // Subtle card & item borders
-  borderLight: '#EDF2F9',     // Thin divider lines
+  border: '#E6EBF3',          // Subtle card & item borders
+  borderLight: '#F0F4FA',     // Thin divider lines
   borderDark: '#CBD5E1',      // Input focus borders
 
   // Status & Functional Accents
-  success: '#10B981',         // Verified, Completed, Accepted
-  successLight: '#ECFDF5',    // Soft green tint
+  success: '#10B981',         // Verified, Completed, Accepted, Online
+  successLight: '#E6F9F0',    // Soft green tint
   warning: '#F59E0B',         // Pending, OTP, Warning
-  warningLight: '#FFFBEB',    // Soft amber tint
+  warningLight: '#FEF3C7',    // Soft amber tint
   danger: '#EF4444',          // Rejected, Cancelled, Errors
-  dangerLight: '#FEF2F2',     // Soft red tint
-  info: '#1769E0',            // Information (uses primary blue)
-  infoLight: '#EBF3FE',
+  dangerLight: '#FEE2E2',     // Soft red tint
+  info: '#0052FF',            // Information (uses primary blue)
+  infoLight: '#EAF1FF',
 
   // Shadows & Overlays
-  shadow: '#0F1E36',
-  overlay: 'rgba(15, 30, 54, 0.65)',
+  shadow: '#101B35',
+  overlay: 'rgba(16, 27, 53, 0.60)',
 
   // Legacy mappings for backward compatibility
   onlineGreen: '#10B981',
-  offlineGray: '#6B7A90',
+  offlineGray: '#718096',
   starGold: '#F59E0B',
-  accent: '#1769E0',
+  accent: '#0052FF',
 };
 
-export const darkColors = colors; // Keep consistent blue-and-white theme
+export const darkColors = colors;
 export default colors;

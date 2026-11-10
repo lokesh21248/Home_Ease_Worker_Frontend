@@ -17,7 +17,7 @@ import { Job } from '../../types';
 import { colors } from '../../theme/colors';
 import { borderRadius, shadows, spacing } from '../../theme/spacing';
 import { CustomHeader } from '../../components/CustomHeader';
-import { BookingCard } from '../../components/BookingCard';
+import { BookingRequestCard } from '../../components/BookingRequestCard';
 import { EmptyState } from '../../components/EmptyState';
 import { useApp } from '../../state/AppContext';
 import { alertFeedbackService } from '../../services/alertFeedbackService';
@@ -132,12 +132,11 @@ export const JobRequestsScreen: React.FC = () => {
           />
         }
         renderItem={({ item }) => (
-          <BookingCard
+          <BookingRequestCard
             job={item}
-            onPress={() => navigation.navigate('JobDetails', { job: item })}
             onAccept={() => handleAccept(item)}
             onReject={() => handleReject(item)}
-            onNavigate={() => navigation.navigate('NavigationTracking', { job: item })}
+            style={{ marginBottom: spacing.md }}
           />
         )}
         ListEmptyComponent={

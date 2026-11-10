@@ -46,7 +46,7 @@ export const BottomTabs: React.FC = () => {
         name="SlotsTab"
         component={SlotsScreen}
         options={{
-          tabBarLabel: 'Schedule',
+          tabBarLabel: 'Slots',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'calendar' : 'calendar-outline'}

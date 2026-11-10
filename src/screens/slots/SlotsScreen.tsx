@@ -25,7 +25,8 @@ import { SectionHeader } from '../../components/SectionHeader';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { SecondaryButton } from '../../components/SecondaryButton';
 import { EmptyState } from '../../components/EmptyState';
-import { LoadingSkeleton, SkeletonCardList } from '../../components/LoadingSkeleton';
+import { SkeletonCardList } from '../../components/LoadingSkeleton';
+import { ScheduledBookingCard } from '../../components/ScheduledBookingCard';
 
 type FilterType = 'all' | 'today' | 'tomorrow' | 'upcoming' | 'completed' | 'cancelled';
 
@@ -247,8 +248,24 @@ export const SlotsScreen: React.FC = () => {
             const isBooked = !!slot.bookingId;
             const isAvailable = slot.isAvailable ?? true;
 
+            if (isBooked) {
+              return (
+                <ScheduledBookingCard
+                  key={slot.bookingId || `slot-${index}`}
+                  bookingId={slot.bookingId || ''}
+                  serviceName={slot.serviceName || 'Home Service'}
+                  customerName={slot.customerName}
+                  scheduledTime={formatSlotTime(slot.scheduledAt)}
+                  scheduledDate={slot.scheduledAt?.split('T')[0]}
+                  locality={slot.address || 'Hyderabad'}
+                  status={slot.status || 'SCHEDULED'}
+                  style={{ marginBottom: spacing.md }}
+                />
+              );
+            }
+
             return (
-              <PremiumCard key={slot.bookingId || `slot-${index}`} style={styles.slotCard}>
+              <PremiumCard key={`slot-${index}`} style={styles.slotCard}>
                 <View style={styles.slotTopRow}>
                   <View style={styles.timeTag}>
                     <Ionicons name="time-outline" size={15} color={colors.primary} />
@@ -260,64 +277,36 @@ export const SlotsScreen: React.FC = () => {
                   <View
                     style={[
                       styles.statusPill,
-                      isBooked
-                        ? styles.statusPillBooked
-                        : isAvailable
-                        ? styles.statusPillAvailable
-                        : styles.statusPillBlocked,
+                      isAvailable ? styles.statusPillAvailable : styles.statusPillBlocked,
                     ]}
                   >
                     <Text
                       style={[
                         styles.statusPillText,
-                        isBooked
-                          ? styles.statusPillTextBooked
-                          : isAvailable
-                          ? styles.statusPillTextAvailable
-                          : styles.statusPillTextBlocked,
+                        isAvailable ? styles.statusPillTextAvailable : styles.statusPillTextBlocked,
                       ]}
                     >
-                      {isBooked ? 'BOOKED' : isAvailable ? 'AVAILABLE' : 'BLOCKED'}
+                      {isAvailable ? 'AVAILABLE' : 'BLOCKED'}
                     </Text>
                   </View>
                 </View>
 
-                {isBooked ? (
-                  <View style={styles.slotDetails}>
-                    <Text style={styles.serviceName}>{slot.serviceName || 'Home Service'}</Text>
-                    {slot.customerName ? (
-                      <View style={styles.customerRow}>
-                        <Ionicons name="person-outline" size={14} color={colors.textSecondary} />
-                        <Text style={styles.customerName}>{slot.customerName}</Text>
-                      </View>
-                    ) : null}
-                    {slot.address ? (
-                      <View style={styles.addressRow}>
-                        <Ionicons name="location-outline" size={14} color={colors.textSecondary} />
-                        <Text style={styles.addressText} numberOfLines={1}>
-                          {slot.address}
-                        </Text>
-                      </View>
-                    ) : null}
-                  </View>
-                ) : (
-                  <View style={styles.availableSlotContent}>
-                    <Text style={styles.openSlotText}>
-                      {isAvailable
-                        ? 'Open for customer instant or scheduled booking'
-                        : 'Blocked - No bookings will be assigned in this hour'}
+                <View style={styles.availableSlotContent}>
+                  <Text style={styles.openSlotText}>
+                    {isAvailable
+                      ? 'Open for customer instant or scheduled booking'
+                      : 'Blocked - No bookings will be assigned in this hour'}
+                  </Text>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    style={[styles.toggleSlotBtn, !isAvailable && styles.toggleSlotBtnEnable]}
+                    onPress={() => handleToggleSlot(slot)}
+                  >
+                    <Text style={[styles.toggleSlotBtnText, !isAvailable && styles.toggleSlotBtnTextEnable]}>
+                      {isAvailable ? 'Block Slot' : 'Make Available'}
                     </Text>
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      style={[styles.toggleSlotBtn, !isAvailable && styles.toggleSlotBtnEnable]}
-                      onPress={() => handleToggleSlot(slot)}
-                    >
-                      <Text style={[styles.toggleSlotBtnText, !isAvailable && styles.toggleSlotBtnTextEnable]}>
-                        {isAvailable ? 'Block Slot' : 'Make Available'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
+                  </TouchableOpacity>
+                </View>
               </PremiumCard>
             );
           })

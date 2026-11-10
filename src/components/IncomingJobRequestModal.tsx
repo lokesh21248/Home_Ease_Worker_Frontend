@@ -4,15 +4,12 @@ import {
   Text,
   StyleSheet,
   Modal,
-  TouchableOpacity,
   Animated,
-  Dimensions,
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { borderRadius, shadows, spacing } from '../theme/spacing';
-import { typography } from '../theme/typography';
 import { Job } from '../types';
 import { PrimaryButton } from './PrimaryButton';
 import { SecondaryButton } from './SecondaryButton';
@@ -25,8 +22,6 @@ interface IncomingJobRequestModalProps {
   onReject: (job: Job) => void;
   countdownSeconds?: number;
 }
-
-const { width } = Dimensions.get('window');
 
 export const IncomingJobRequestModal: React.FC<IncomingJobRequestModalProps> = ({
   visible,

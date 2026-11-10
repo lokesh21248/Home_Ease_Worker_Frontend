@@ -73,6 +73,15 @@ export const ProfileScreen: React.FC = () => {
       onPress: () => navigation.navigate('ServiceSelection', { isOnboarding: false }),
     },
     {
+      id: 'pincodes',
+      title: 'Service Areas & Pincodes',
+      subtitle: worker.workingPincodes && worker.workingPincodes.length > 0
+        ? `${worker.workingPincodes.length} pincodes active (${worker.workingPincodes.slice(0, 3).join(', ')}${worker.workingPincodes.length > 3 ? '...' : ''})`
+        : 'Active service areas configured',
+      icon: 'location-outline' as const,
+      onPress: () => navigation.navigate('AvailabilitySetup', { isOnboarding: false }),
+    },
+    {
       id: 'availability',
       title: 'Schedule & Availability',
       subtitle: `${worker.availability.days.length} working days • ${worker.availability.startHour} - ${worker.availability.endHour}`,

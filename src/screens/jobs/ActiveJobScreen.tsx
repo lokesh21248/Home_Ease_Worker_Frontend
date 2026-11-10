@@ -24,6 +24,8 @@ import { PremiumCard } from '../../components/PremiumCard';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { SecondaryButton } from '../../components/SecondaryButton';
 import { EmptyState } from '../../components/EmptyState';
+import { JobTimeline } from '../../components/JobTimeline';
+import { LocationCard } from '../../components/LocationCard';
 import { useApp } from '../../state/AppContext';
 import { openTurnByTurnNavigation } from '../../utils/navigationHelper';
 import { resolveBookingUuid } from '../../utils/uuid';
@@ -204,53 +206,10 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
         showsVerticalScrollIndicator={false}
       >
         {/* Progression Stepper */}
-        <PremiumCard style={styles.card}>
-          <Text style={styles.cardTitle}>Service Progression</Text>
-          <View style={styles.stepperRow}>
-            {STATUS_STEPS.map((step, idx) => {
-              const isPast = idx < currentStepIdx;
-              const isCurrent = idx === currentStepIdx;
-              const isActive = isCurrent || isPast;
-
-              return (
-                <React.Fragment key={step.key}>
-                  <View style={styles.stepItem}>
-                    <View
-                      style={[
-                        styles.stepDot,
-                        isActive && styles.stepDotActive,
-                        isCurrent && styles.stepDotCurrent,
-                      ]}
-                    >
-                      <Ionicons
-                        name={step.icon}
-                        size={14}
-                        color={isActive ? '#FFFFFF' : colors.textSecondary}
-                      />
-                    </View>
-                    <Text
-                      style={[
-                        styles.stepLabel,
-                        isActive && styles.stepLabelActive,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {step.label}
-                    </Text>
-                  </View>
-                  {idx < STATUS_STEPS.length - 1 && (
-                    <View
-                      style={[
-                        styles.stepLine,
-                        idx < currentStepIdx && styles.stepLineActive,
-                      ]}
-                    />
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </View>
-        </PremiumCard>
+        <JobTimeline
+          currentStatus={currentJob.status}
+          style={{ marginBottom: spacing.md }}
+        />
 
         {/* Live Stopwatch Card */}
         <PremiumCard style={styles.timerCard}>
@@ -292,7 +251,7 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
         </PremiumCard>
 
-        {/* Customer Card with Call & Address */}
+        {/* Customer Details Card */}
         <PremiumCard style={styles.card}>
           <View style={styles.customerRow}>
             <Image
@@ -306,8 +265,8 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
             <View style={styles.customerMeta}>
               <Text style={styles.customerName}>{currentJob.customer.name}</Text>
               <Text style={styles.customerPhone}>{currentJob.customer.phone}</Text>
-              <Text style={styles.addressText} numberOfLines={2}>
-                {currentJob.location.address}
+              <Text style={styles.orderMetaText}>
+                Order #{currentJob.jobId} • {currentJob.bookingType || 'Instant'}
               </Text>
             </View>
 
@@ -316,40 +275,29 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
               activeOpacity={0.8}
               onPress={() => Alert.alert('Calling Customer', `Dialing ${currentJob.customer.phone}`)}
             >
-              <Ionicons name="call-outline" size={20} color={colors.primary} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Turn-by-Turn GPS Navigation Launcher */}
-          <View style={styles.navRowWrapper}>
-            <TouchableOpacity
-              style={styles.primaryNavBtn}
-              activeOpacity={0.85}
-              onPress={() =>
-                openTurnByTurnNavigation({
-                  latitude: currentJob.location.latitude,
-                  longitude: currentJob.location.longitude,
-                  label: `${currentJob.customer.name} - ${currentJob.serviceName}`,
-                  address: currentJob.location.address,
-                })
-              }
-            >
-              <Ionicons name="navigate-circle-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.primaryNavBtnText}>
-                Turn-by-Turn GPS ({currentJob.location.distanceKm} km)
-              </Text>
-              <Ionicons name="open-outline" size={16} color="#FFFFFF" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.secondaryNavBtn}
-              activeOpacity={0.85}
-              onPress={() => navigation.navigate('NavigationTracking', { job: currentJob })}
-            >
-              <Ionicons name="map-outline" size={20} color={colors.primary} />
+              <Ionicons name="call" size={18} color={colors.primary} />
             </TouchableOpacity>
           </View>
         </PremiumCard>
+
+        {/* Customer Destination & GPS Navigation Card */}
+        <LocationCard
+          address={currentJob.location.address}
+          pincode={currentJob.location.pincode}
+          distanceKm={currentJob.location.distanceKm}
+          etaMinutes={currentJob.estimatedArrivalMinutes}
+          customerPhone={currentJob.customer.phone}
+          onNavigate={() =>
+            openTurnByTurnNavigation({
+              latitude: currentJob.location.latitude,
+              longitude: currentJob.location.longitude,
+              label: `${currentJob.customer.name} - ${currentJob.serviceName}`,
+              address: currentJob.location.address,
+            })
+          }
+          onCall={() => Alert.alert('Calling Customer', `Dialing ${currentJob.customer.phone}`)}
+          style={{ marginBottom: spacing.md }}
+        />
 
         {/* Service Standard Checklist */}
         <PremiumCard style={styles.card}>
@@ -435,7 +383,27 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
 
       {/* Action Footer */}
       <View style={styles.footer}>
-        {currentJob.status !== 'started' ? (
+        {currentJob.status === 'accepted' && (
+          <PrimaryButton
+            title="Start Travelling to Customer"
+            size="lg"
+            fullWidth
+            onPress={() => updateJobStatus('travelling')}
+            icon={<Ionicons name="bicycle-outline" size={20} color="#FFFFFF" />}
+          />
+        )}
+
+        {currentJob.status === 'travelling' && (
+          <PrimaryButton
+            title="I Have Arrived at Location"
+            size="lg"
+            fullWidth
+            onPress={() => updateJobStatus('arrived')}
+            icon={<Ionicons name="location-outline" size={20} color="#FFFFFF" />}
+          />
+        )}
+
+        {currentJob.status === 'arrived' && (
           <PrimaryButton
             title="Verify Doorstep PIN & Start"
             size="lg"
@@ -443,7 +411,9 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
             onPress={handleStartJob}
             icon={<Ionicons name="keypad-outline" size={20} color="#FFFFFF" />}
           />
-        ) : (
+        )}
+
+        {currentJob.status === 'started' && (
           <PrimaryButton
             title="Complete Job & Upload Proofs"
             size="lg"
@@ -800,6 +770,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textSecondary,
     marginTop: 1,
+  },
+  orderMetaText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
   addressText: {
     fontSize: 12,
