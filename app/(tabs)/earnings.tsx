@@ -4,3 +4,4 @@ import { EarningsScreen } from '../../src/screens/earnings/EarningsScreen';
 export default function EarningsRoute() {
   return <EarningsScreen />;
 }
+

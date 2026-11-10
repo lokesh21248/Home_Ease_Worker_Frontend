@@ -4,3 +4,4 @@ import { HomeDashboardScreen } from '../../src/screens/dashboard/HomeDashboardSc
 export default function HomeRoute() {
   return <HomeDashboardScreen />;
 }
+
