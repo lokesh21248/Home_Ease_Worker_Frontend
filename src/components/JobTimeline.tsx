@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Check, Navigation, MapPin, Wrench, ShieldCheck } from 'lucide-react-native';
 import { colors } from '../theme/colors';
 import { borderRadius, spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
@@ -9,15 +9,15 @@ import { JobStatus } from '../types';
 export interface TimelineStep {
   key: JobStatus | string;
   label: string;
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: React.ComponentType<{ size?: number; color?: string }>;
 }
 
 const DEFAULT_STEPS: TimelineStep[] = [
-  { key: 'accepted', label: 'Accepted', icon: 'checkmark-circle' },
-  { key: 'travelling', label: 'On Way', icon: 'bicycle' },
-  { key: 'arrived', label: 'Arrived', icon: 'location' },
-  { key: 'started', label: 'In Progress', icon: 'hammer' },
-  { key: 'completed', label: 'Completed', icon: 'shield-checkmark' },
+  { key: 'accepted', label: 'Accepted', icon: Check },
+  { key: 'travelling', label: 'On Way', icon: Navigation },
+  { key: 'arrived', label: 'Arrived', icon: MapPin },
+  { key: 'started', label: 'In Progress', icon: Wrench },
+  { key: 'completed', label: 'Completed', icon: ShieldCheck },
 ];
 
 interface JobTimelineProps {
@@ -63,6 +63,7 @@ export const JobTimeline: React.FC<JobTimelineProps> = ({
           const isDone = idx < activeIdx;
           const isCurrent = idx === activeIdx;
           const isPending = idx > activeIdx;
+          const IconComp = isDone ? Check : step.icon;
 
           return (
             <React.Fragment key={step.key}>
@@ -75,9 +76,8 @@ export const JobTimeline: React.FC<JobTimelineProps> = ({
                     isPending && styles.dotPending,
                   ]}
                 >
-                  <Ionicons
-                    name={isDone ? 'checkmark' : step.icon}
-                    size={13}
+                  <IconComp
+                    size={12}
                     color={
                       isDone || isCurrent
                         ? colors.textInverse
@@ -140,37 +140,34 @@ const styles = StyleSheet.create({
   },
   dotCurrent: {
     backgroundColor: colors.primary,
-    borderWidth: 2,
-    borderColor: colors.secondary,
+    borderWidth: 3,
+    borderColor: colors.primarySoft,
   },
   dotPending: {
-    backgroundColor: colors.background,
-    borderWidth: 1.5,
-    borderColor: colors.borderDark,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   connector: {
     flex: 1,
     height: 2,
-    backgroundColor: colors.border,
-    marginBottom: 16,
-    marginHorizontal: -4,
+    backgroundColor: colors.borderLight,
+    marginBottom: spacing.md,
   },
   connectorActive: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.success,
   },
   stepLabel: {
     fontSize: 10,
     fontFamily: typography.fontFamily.medium,
-    color: colors.textSecondary,
+    color: colors.textMuted,
     textAlign: 'center',
   },
   labelCurrent: {
-    fontFamily: typography.fontFamily.bold,
     color: colors.primary,
+    fontFamily: typography.fontFamily.bold,
   },
   labelDone: {
     color: colors.textPrimary,
   },
 });
-
-export default JobTimeline;

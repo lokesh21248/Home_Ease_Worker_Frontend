@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   ViewStyle,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Wallet, ChevronRight } from 'lucide-react-native';
 import { colors } from '../theme/colors';
 import { borderRadius, spacing, shadows } from '../theme/spacing';
 import { typography } from '../theme/typography';
@@ -34,7 +34,7 @@ export const EarningsSummaryCard: React.FC<EarningsSummaryCardProps> = ({
       <View style={styles.topRow}>
         <View style={styles.badgeRow}>
           <View style={styles.iconCircle}>
-            <Ionicons name="wallet" size={16} color={colors.primary} />
+            <Wallet size={16} color={colors.primary} />
           </View>
           <Text style={styles.cardTitle}>Today's Earnings</Text>
         </View>
@@ -46,7 +46,7 @@ export const EarningsSummaryCard: React.FC<EarningsSummaryCardProps> = ({
             activeOpacity={0.7}
           >
             <Text style={styles.detailLinkText}>View All</Text>
-            <Ionicons name="chevron-forward" size={14} color={colors.primary} />
+            <ChevronRight size={14} color={colors.primary} />
           </TouchableOpacity>
         )}
       </View>
@@ -193,3 +193,4 @@ const styles = StyleSheet.create({
 });
 
 export default EarningsSummaryCard;
+

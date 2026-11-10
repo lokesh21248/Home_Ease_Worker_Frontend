@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   ViewStyle,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { MapPin, Navigation, Phone } from 'lucide-react-native';
 import { colors } from '../theme/colors';
 import { borderRadius, spacing, shadows } from '../theme/spacing';
 import { typography } from '../theme/typography';
@@ -37,13 +37,13 @@ export const LocationCard: React.FC<LocationCardProps> = ({
       {/* Header with Distance / ETA pill */}
       <View style={styles.headerRow}>
         <View style={styles.titleRow}>
-          <Ionicons name="location" size={18} color={colors.primary} />
+          <MapPin size={18} color={colors.primary} />
           <Text style={styles.cardTitle}>Customer Destination</Text>
         </View>
 
         {(distanceKm !== undefined || etaMinutes !== undefined) && (
           <View style={styles.etaPill}>
-            <Ionicons name="navigate" size={11} color={colors.primary} />
+            <Navigation size={11} color={colors.primary} />
             <Text style={styles.etaText}>
               {distanceKm !== undefined ? `${distanceKm.toFixed(1)} km` : ''}
               {distanceKm !== undefined && etaMinutes !== undefined ? ' • ' : ''}
@@ -65,7 +65,7 @@ export const LocationCard: React.FC<LocationCardProps> = ({
             onPress={onNavigate}
             activeOpacity={0.85}
           >
-            <Ionicons name="navigate" size={16} color={colors.textInverse} />
+            <Navigation size={15} color={colors.textInverse} />
             <Text style={styles.navBtnText}>Google Maps</Text>
           </TouchableOpacity>
         )}
@@ -76,7 +76,7 @@ export const LocationCard: React.FC<LocationCardProps> = ({
             onPress={onCall}
             activeOpacity={0.8}
           >
-            <Ionicons name="call" size={16} color={colors.primary} />
+            <Phone size={15} color={colors.primary} />
             <Text style={styles.callBtnText}>Call Customer</Text>
           </TouchableOpacity>
         )}
@@ -181,3 +181,4 @@ const styles = StyleSheet.create({
 });
 
 export default LocationCard;
+

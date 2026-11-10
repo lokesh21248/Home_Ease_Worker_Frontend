@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   ViewStyle,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { MapPin, Navigation, ArrowRight } from 'lucide-react-native';
 import { colors } from '../theme/colors';
 import { borderRadius, spacing, shadows } from '../theme/spacing';
 import { typography } from '../theme/typography';
@@ -53,7 +53,7 @@ export const ActiveJobCard: React.FC<ActiveJobCardProps> = ({
         <Text style={styles.customerName}>For {customerName}</Text>
 
         <View style={styles.locationRow}>
-          <Ionicons name="location-outline" size={15} color={colors.textSecondary} />
+          <MapPin size={14} color={colors.textSecondary} />
           <Text style={styles.locationText} numberOfLines={1}>
             {locationText}
           </Text>
@@ -75,7 +75,7 @@ export const ActiveJobCard: React.FC<ActiveJobCardProps> = ({
               activeOpacity={0.8}
               accessibilityLabel="Navigate"
             >
-              <Ionicons name="navigate" size={16} color={colors.primary} />
+              <Navigation size={16} color={colors.primary} />
             </TouchableOpacity>
           )}
 
@@ -85,7 +85,7 @@ export const ActiveJobCard: React.FC<ActiveJobCardProps> = ({
             activeOpacity={0.85}
           >
             <Text style={styles.ctaText}>View Job Details</Text>
-            <Ionicons name="arrow-forward" size={14} color={colors.textInverse} />
+            <ArrowRight size={14} color={colors.textInverse} />
           </TouchableOpacity>
         </View>
       </View>

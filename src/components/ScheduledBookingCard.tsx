@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   ViewStyle,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Clock, MapPin, Timer } from 'lucide-react-native';
 import { colors } from '../theme/colors';
 import { borderRadius, spacing, shadows } from '../theme/spacing';
 import { typography } from '../theme/typography';
@@ -48,7 +48,7 @@ export const ScheduledBookingCard: React.FC<ScheduledBookingCardProps> = ({
       {/* Header: Date/Time Badge & Status */}
       <View style={styles.headerRow}>
         <View style={styles.timeBadge}>
-          <Ionicons name="time-outline" size={13} color={colors.primary} />
+          <Clock size={13} color={colors.primary} />
           <Text style={styles.timeBadgeText}>
             {scheduledDate ? `${scheduledDate} • ` : ''}{scheduledTime}
           </Text>
@@ -66,7 +66,7 @@ export const ScheduledBookingCard: React.FC<ScheduledBookingCardProps> = ({
 
         <View style={styles.metaRow}>
           <View style={styles.metaItem}>
-            <Ionicons name="location-outline" size={13} color={colors.textSecondary} />
+            <MapPin size={13} color={colors.textSecondary} />
             <Text style={styles.metaText} numberOfLines={1}>
               {locality}
             </Text>
@@ -75,7 +75,7 @@ export const ScheduledBookingCard: React.FC<ScheduledBookingCardProps> = ({
           <View style={styles.metaDot} />
 
           <View style={styles.metaItem}>
-            <Ionicons name="hourglass-outline" size={13} color={colors.textSecondary} />
+            <Timer size={13} color={colors.textSecondary} />
             <Text style={styles.metaText}>{durationMins} Mins</Text>
           </View>
         </View>
@@ -180,3 +180,4 @@ const styles = StyleSheet.create({
 });
 
 export default ScheduledBookingCard;
+

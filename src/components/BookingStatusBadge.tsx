@@ -73,3 +73,4 @@ export const BookingStatusBadge: React.FC<BookingStatusBadgeProps> = ({
 };
 
 export default BookingStatusBadge;
+

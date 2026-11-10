@@ -37,10 +37,12 @@
       },
       "predictiveBackGestureEnabled": false
     },
+    "scheme": "homeease-worker",
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      "expo-router",
       "expo-font",
       [
         "expo-build-properties",

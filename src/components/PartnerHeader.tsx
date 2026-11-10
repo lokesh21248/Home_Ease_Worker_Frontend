@@ -7,9 +7,9 @@ import {
   Image,
   ViewStyle,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { CheckCircle2, MapPin, Bell } from 'lucide-react-native';
 import { colors } from '../theme/colors';
-import { borderRadius, spacing, shadows } from '../theme/spacing';
+import { borderRadius, spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 
 interface PartnerHeaderProps {
@@ -68,8 +68,7 @@ export const PartnerHeader: React.FC<PartnerHeaderProps> = ({
               {partnerName || 'Partner'}
             </Text>
             {isVerified && (
-              <Ionicons
-                name="checkmark-circle"
+              <CheckCircle2
                 size={16}
                 color={colors.primary}
                 style={styles.verifiedIcon}
@@ -78,7 +77,7 @@ export const PartnerHeader: React.FC<PartnerHeaderProps> = ({
           </View>
 
           <View style={styles.locationRow}>
-            <Ionicons name="location-sharp" size={12} color={colors.textSecondary} />
+            <MapPin size={12} color={colors.textSecondary} />
             <Text style={styles.localityText} numberOfLines={1}>
               {locality}
             </Text>
@@ -93,7 +92,7 @@ export const PartnerHeader: React.FC<PartnerHeaderProps> = ({
         activeOpacity={0.8}
         accessibilityLabel="Notifications"
       >
-        <Ionicons name="notifications-outline" size={22} color={colors.textPrimary} />
+        <Bell size={20} color={colors.textPrimary} />
         {unreadCount > 0 && (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>
@@ -222,3 +221,4 @@ const styles = StyleSheet.create({
 });
 
 export default PartnerHeader;
+

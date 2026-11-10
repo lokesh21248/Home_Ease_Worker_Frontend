@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   ViewStyle,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Zap, Calendar, MapPin, Navigation, Clock, CreditCard, CheckCircle2 } from 'lucide-react-native';
 import { colors } from '../theme/colors';
 import { borderRadius, spacing, shadows } from '../theme/spacing';
 import { typography } from '../theme/typography';
@@ -38,11 +38,11 @@ export const BookingRequestCard: React.FC<BookingRequestCardProps> = ({
       {/* Header Tag */}
       <View style={styles.headerRow}>
         <View style={styles.tagPill}>
-          <Ionicons
-            name={isInstant ? 'flash' : 'calendar'}
-            size={12}
-            color={colors.primary}
-          />
+          {isInstant ? (
+            <Zap size={12} color={colors.primary} />
+          ) : (
+            <Calendar size={12} color={colors.primary} />
+          )}
           <Text style={styles.tagText}>
             {isInstant ? 'INSTANT DISPATCH' : 'SCHEDULED REQUEST'}
           </Text>
@@ -58,7 +58,7 @@ export const BookingRequestCard: React.FC<BookingRequestCardProps> = ({
       {/* Meta Information */}
       <View style={styles.metaContainer}>
         <View style={styles.metaRow}>
-          <Ionicons name="location" size={14} color={colors.primary} />
+          <MapPin size={14} color={colors.primary} />
           <Text style={styles.metaLocation} numberOfLines={1}>
             {customerLocation}
           </Text>
@@ -66,17 +66,17 @@ export const BookingRequestCard: React.FC<BookingRequestCardProps> = ({
 
         <View style={styles.metaDetails}>
           <View style={styles.metaPill}>
-            <Ionicons name="navigate-outline" size={12} color={colors.textSecondary} />
+            <Navigation size={12} color={colors.textSecondary} />
             <Text style={styles.metaDetailText}>{distanceText}</Text>
           </View>
 
           <View style={styles.metaPill}>
-            <Ionicons name="time-outline" size={12} color={colors.textSecondary} />
+            <Clock size={12} color={colors.textSecondary} />
             <Text style={styles.metaDetailText}>{job.scheduledTime || 'Immediate'}</Text>
           </View>
 
           <View style={styles.metaPill}>
-            <Ionicons name="card-outline" size={12} color={colors.textSecondary} />
+            <CreditCard size={12} color={colors.textSecondary} />
             <Text style={styles.metaDetailText}>{job.paymentMode || 'Online'}</Text>
           </View>
         </View>
@@ -98,7 +98,7 @@ export const BookingRequestCard: React.FC<BookingRequestCardProps> = ({
           activeOpacity={0.85}
           disabled={isAccepting}
         >
-          <Ionicons name="checkmark-circle" size={16} color={colors.textInverse} />
+          <CheckCircle2 size={16} color={colors.textInverse} />
           <Text style={styles.acceptBtnText}>
             {isAccepting ? 'Accepting...' : 'Accept Job'}
           </Text>
