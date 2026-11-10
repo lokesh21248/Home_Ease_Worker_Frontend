@@ -21,7 +21,7 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { useApp } from '../../state/AppContext';
 import { openTurnByTurnNavigation, safeGoBack } from '../../utils/navigationHelper';
 import { alertFeedbackService } from '../../services/alertFeedbackService';
-import { locationService, LocationData } from '../../services/locationService';
+import { LocationData } from '../../services/locationService';
 import { workerApiService } from '../../api/workerApiService';
 import { workerTrackingLifecycle } from '../../services/TrackingLifecycleManager';
 import { resolveBookingUuid } from '../../utils/uuid';
@@ -48,7 +48,18 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
   const hasFetchedInitialRoute = useRef(false);
 
   const [etaMins, setEtaMins] = useState(8);
+  const [estimatedArrivalTime, setEstimatedArrivalTime] = useState<string>('');
   const [distanceKm, setDistanceKm] = useState(job.location.distanceKm || 1.8);
+
+  useEffect(() => {
+    const d = new Date(Date.now() + etaMins * 60 * 1000);
+    setEstimatedArrivalTime(
+      d.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    );
+  }, [etaMins]);
   const [isArriving, setIsArriving] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState('');
@@ -232,12 +243,7 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
           <View style={styles.etaDivider} />
           <View style={styles.arrivalCol}>
             <Text style={styles.arrivalLabel}>Est. Arrival</Text>
-            <Text style={styles.arrivalValue}>
-              {new Date(Date.now() + etaMins * 60 * 1000).toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </Text>
+            <Text style={styles.arrivalValue}>{estimatedArrivalTime || '--:--'}</Text>
           </View>
         </View>
       </View>
