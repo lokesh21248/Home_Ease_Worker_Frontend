@@ -62,7 +62,7 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
     {
       id: 'm2',
       sender: 'worker',
-      text: 'Hello! Noted. I am on the bike and will reach in about 8 minutes.',
+      text: 'Hello! Noted. I am on my way and will reach in about 8 minutes.',
       time: '11:16 AM',
     },
   ]);
@@ -72,7 +72,7 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
     let isMounted = true;
 
     // Trigger ON_THE_WAY on backend
-    workerApiService.startTravelling(bookingId).catch(() => {});
+    workerApiService.startTravelling(bookingId).catch(() => { });
 
     // Start travel tracking lifecycle
     workerTrackingLifecycle.startTravelTracking(
@@ -96,7 +96,7 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
                 setRouteCoordinates(routeData.coordinates);
               }
             })
-            .catch(() => {});
+            .catch(() => { });
         }
       },
       (distanceData) => {

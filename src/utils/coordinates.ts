@@ -41,3 +41,20 @@ export function toGoogleMapCoordinates(
     .filter((c) => isValidCoordinate(c.latitude, c.longitude));
 }
 
+/**
+ * Calculates the shortest angular difference between two headings in degrees (-180 to 180).
+ * Handles the 359° <-> 1° transition without spinning around.
+ */
+export function shortestAngleDistance(fromAngle: number, toAngle: number): number {
+  return ((((toAngle - fromAngle) % 360) + 540) % 360) - 180;
+}
+
+/**
+ * Normalizes any heading angle into standard [0, 360) compass range.
+ */
+export function normalizeHeading(heading: number): number {
+  if (!Number.isFinite(heading)) return 0;
+  return ((heading % 360) + 360) % 360;
+}
+
+

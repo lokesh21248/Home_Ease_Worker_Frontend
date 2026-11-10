@@ -25,6 +25,7 @@ import MapView, {
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme/colors';
 import { isValidCoordinate, toGoogleMapCoordinates, LatLngCoordinate } from '../../utils/coordinates';
+import { WorkerNavigationMarker } from './WorkerNavigationMarker';
 
 export interface PartnerGoogleMapHandle {
   recenterToWorker: () => void;
@@ -248,30 +249,14 @@ export const PartnerGoogleMapView = forwardRef<PartnerGoogleMapHandle, PartnerGo
             </Marker>
           )}
 
-          {/* Worker / Partner Live Marker */}
+          {/* Worker / Partner Live Directional Marker */}
           {hasValidWorker && (
-            <Marker
+            <WorkerNavigationMarker
               coordinate={{ latitude: workerLat!, longitude: workerLng! }}
-              anchor={{ x: 0.5, y: 0.5 }}
-              flat={true}
-              rotation={workerHeading ?? 0}
-              title="Your Location"
-              tracksViewChanges={false}
-            >
-              <View style={styles.workerMarkerContainer}>
-                <Animated.View
-                  style={[
-                    styles.workerRadarRing,
-                    {
-                      transform: [{ scale: pulseAnim }],
-                    },
-                  ]}
-                />
-                <View style={styles.workerMarkerCore}>
-                  <Ionicons name="bicycle" size={18} color="#FFFFFF" />
-                </View>
-              </View>
-            </Marker>
+              heading={workerHeading ?? 0}
+              name="Your Location"
+              isLive={true}
+            />
           )}
         </MapView>
       </View>
