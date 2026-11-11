@@ -645,7 +645,11 @@ class WorkerApiService {
       );
       return (response.data as any)?.data ?? response.data;
     } catch (error: any) {
-      console.warn('[WorkerApi] arriveAtCustomer notice:', error?.message);
+      const errorMsg = error?.response?.data?.message || error?.message;
+      if (errorMsg && (errorMsg.includes('ARRIVED') || errorMsg.includes('already'))) {
+        return { success: true, bookingId: resolvedBookingId, status: 'ARRIVED' };
+      }
+      console.warn('[WorkerApi] arriveAtCustomer notice:', errorMsg);
       return { success: true, bookingId: resolvedBookingId };
     }
   }

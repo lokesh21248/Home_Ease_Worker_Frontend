@@ -156,14 +156,6 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
     workerTrackingLifecycle.stopTracking(bookingId);
     alertFeedbackService.playSuccessFeedback();
 
-    try {
-      // 1. Sync Arrival with Backend Monolith (POST /workers/bookings/{id}/arrive)
-      // This atomically updates booking status to ARRIVED, marks session ARRIVED, and generates the service start OTP
-      await workerApiService.arriveAtCustomer(bookingId);
-    } catch (err: any) {
-      console.warn('[NavigationTrackingScreen] arriveAtCustomer backend sync:', err?.message);
-    }
-
     updateJobStatus('arrived');
     setIsArriving(false);
     navigation.navigate('ActiveJob', { job: { ...job, bookingId, status: 'arrived' }, bookingId });

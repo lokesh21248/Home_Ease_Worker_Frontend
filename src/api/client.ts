@@ -27,15 +27,16 @@ class ApiClient {
         const uid = this.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
 
         if (config.headers) {
-          if (this.authToken && !config.headers.Authorization) {
-            config.headers.Authorization = `Bearer ${this.authToken}`;
+          const authVal = this.authToken ? `Bearer ${this.authToken}` : `Bearer ${uid}`;
+          if (!config.headers.Authorization) {
+            config.headers.Authorization = authVal;
           }
           if (!config.headers['X-User-Id']) {
             config.headers['X-User-Id'] = uid;
           }
           if (typeof config.headers.set === 'function') {
-            if (this.authToken && !config.headers.has('Authorization')) {
-              config.headers.set('Authorization', `Bearer ${this.authToken}`);
+            if (!config.headers.has('Authorization')) {
+              config.headers.set('Authorization', authVal);
             }
             if (!config.headers.has('X-User-Id')) {
               config.headers.set('X-User-Id', uid);

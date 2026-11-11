@@ -1106,7 +1106,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       workerApiService.startTravelling(bId).catch((e) => console.warn('[AppContext] startTravelling:', e?.message));
     } else if (newStatus === 'arrived') {
       workerTrackingLifecycle.stopTracking(bId);
-      workerApiService.arriveAtCustomer(bId).catch((e) => console.warn('[AppContext] arriveAtCustomer:', e?.message));
+      if (activeJob.status !== 'arrived') {
+        workerApiService.arriveAtCustomer(bId).catch((e) => console.warn('[AppContext] arriveAtCustomer:', e?.message));
+      }
     } else if (newStatus === 'started' || newStatus === 'completed') {
       workerTrackingLifecycle.stopTracking(bId);
     }
