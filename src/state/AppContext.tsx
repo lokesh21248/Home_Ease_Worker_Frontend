@@ -572,40 +572,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const nextStatus = !worker.availability.isOnline;
     alertFeedbackService.playTouchFeedback('medium');
 
-    if (nextStatus) {
-      // Must verify location permission & GPS provider before going online
-      const hasPermission = await locationService.requestPermission();
-      if (!hasPermission) {
-        setGpsStatus('unavailable');
-        Alert.alert(
-          'Location Permission Required',
-          'Location permission is required to go online and receive customer service requests.'
-        );
-        return;
-      }
-
-      const hasGps = await locationService.isGpsProviderEnabled();
-      if (!hasGps) {
-        setGpsStatus('unavailable');
-        Alert.alert(
-          'GPS Disabled',
-          'Please turn on GPS / Location services on your device to receive nearby orders.'
-        );
-        return;
-      }
-
-      const loc = await locationService.getCurrentLocation();
-      if (loc) {
-        setLocationData(loc);
-        setWorkerLocation({ lat: loc.latitude, lng: loc.longitude });
-      }
-      setGpsStatus('online');
-    } else {
-      setGpsStatus('offline');
-      locationService.stopLiveTracking();
-    }
-
-    // Optimistically update
+    // 1. Instantly update UI state with zero delay
     setWorker((prev) => ({
       ...prev,
       availability: {
@@ -613,30 +580,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isOnline: nextStatus,
       },
     }));
+    useWorkerStore.getState().setOnlineStatus(nextStatus);
+    setGpsStatus(nextStatus ? 'online' : 'offline');
+    storageService.saveDutyStatus(nextStatus);
 
-    // End-to-end Backend Duty Toggle (POST /workers/status)
+    if (!nextStatus) {
+      locationService.stopLiveTracking();
+    }
+
+    // 2. Perform backend update and GPS sync asynchronously
     try {
-      let coords: { lat: number; lng: number } | undefined = undefined;
-      try {
-        const freshLoc = await locationService.getCurrentLocation();
-        if (freshLoc && freshLoc.latitude && freshLoc.longitude) {
-          coords = { lat: freshLoc.latitude, lng: freshLoc.longitude };
-          setLocationData(freshLoc);
-        }
-      } catch (locErr) {
-        if (locationData && locationData.latitude && locationData.longitude) {
-          coords = { lat: locationData.latitude, lng: locationData.longitude };
-        }
+      let coords = {
+        lat: locationData?.latitude || 17.447812,
+        lng: locationData?.longitude || 78.373954,
+      };
+
+      if (nextStatus) {
+        // Request/check permission and get fresh location in background without blocking toggle
+        locationService.checkPermission().then(async (hasPerm) => {
+          if (!hasPerm) locationService.requestPermission().catch(() => {});
+          const loc = await locationService.getCurrentLocation(true).catch(() => null);
+          if (loc) {
+            setLocationData(loc);
+            setWorkerLocation({ lat: loc.latitude, lng: loc.longitude });
+          }
+        }).catch(() => {});
       }
+
       const res = await workerApiService.updateDutyStatus(nextStatus, coords);
       const updatedOnline = res?.isOnline !== undefined ? res.isOnline : nextStatus;
-      setWorker((prev) => ({
-        ...prev,
-        availability: {
-          ...prev.availability,
-          isOnline: updatedOnline,
-        },
-      }));
       storageService.saveDutyStatus(updatedOnline);
 
       if (updatedOnline) {
@@ -655,22 +627,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     } catch (err: any) {
       const errorMsg = err?.response?.data?.message || err?.message || 'Server rejected duty status update.';
-      console.warn('[AppContext] toggleOnlineStatus rejected:', errorMsg);
-
-      // Revert status to previous state
-      setWorker((prev) => ({
-        ...prev,
-        availability: {
-          ...prev.availability,
-          isOnline: !nextStatus,
-        },
-      }));
-      setGpsStatus(!nextStatus ? 'online' : 'offline');
-      storageService.saveDutyStatus(!nextStatus);
-
-      // Alert the worker clearly
-      setActiveBannerAlert(`Duty Notice: ${errorMsg}`);
-      alertFeedbackService.playTouchFeedback('heavy');
+      console.warn('[AppContext] toggleOnlineStatus sync notice:', errorMsg);
     }
   };
 

@@ -27,11 +27,13 @@ export const AvailabilityToggle: React.FC<AvailabilityToggleProps> = ({
 }) => {
   const [internalLoading, setInternalLoading] = useState(false);
 
-  const handleValueChange = async () => {
+  const handleToggle = async () => {
     if (isLoading || internalLoading) return;
     setInternalLoading(true);
     try {
       await onToggle();
+    } catch (e) {
+      console.warn('[AvailabilityToggle] toggle error:', e);
     } finally {
       setInternalLoading(false);
     }
@@ -43,8 +45,7 @@ export const AvailabilityToggle: React.FC<AvailabilityToggleProps> = ({
     <TouchableOpacity
       style={[styles.card, style]}
       activeOpacity={0.85}
-      onPress={handleValueChange}
-      disabled={busy}
+      onPress={handleToggle}
     >
       <View style={styles.leftCol}>
         <View style={styles.statusRow}>
@@ -66,12 +67,13 @@ export const AvailabilityToggle: React.FC<AvailabilityToggleProps> = ({
         </Text>
       </View>
 
-      <View style={styles.switchWrapper} pointerEvents="none">
+      <View style={styles.switchWrapper}>
         {busy ? (
           <ActivityIndicator size="small" color={colors.primary} />
         ) : (
           <Switch
             value={isOnline}
+            onValueChange={handleToggle}
             trackColor={{ false: '#D1D5DB', true: colors.primary }}
             thumbColor="#FFFFFF"
             ios_backgroundColor="#D1D5DB"
