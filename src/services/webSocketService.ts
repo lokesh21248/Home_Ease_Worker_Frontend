@@ -1,16 +1,33 @@
 import { BASE_API_URL } from '../api/endpoints';
 
-// Derive WebSocket URL from BASE_API_URL: e.g. http://3.108.55.219/api/v1 -> ws://3.108.55.219/worker/stream/websocket
-// Spring core registers /worker/stream endpoint; raw WebSocket transport is available at /worker/stream/websocket
-const getWebSocketUrl = (): string => {
+// Candidate WebSocket URLs for resilient real-time STOMP connection
+const getCandidateWebSocketUrls = (): string[] => {
+  const candidates: string[] = [];
+
+  // 1. Env configured tracking ws url if present
+  if (process.env.EXPO_PUBLIC_TRACKING_WS_URL) {
+    const envUrl = process.env.EXPO_PUBLIC_TRACKING_WS_URL.trim();
+    if (envUrl) candidates.push(envUrl);
+  }
+
+  // 2. Derive endpoints from BASE_API_URL
   try {
     const url = new URL(BASE_API_URL);
     const wsProto = url.protocol === 'https:' ? 'wss:' : 'ws:';
-    // Core WebSocket broker endpoint for worker job dispatch
-    return `${wsProto}//${url.host}/worker/stream/websocket`;
+    const host = url.host;
+    const workerEndpoint = `${wsProto}//${host}/worker/stream/websocket`;
+    const standardEndpoint = `${wsProto}//${host}/ws`;
+
+    if (!candidates.includes(workerEndpoint)) candidates.push(workerEndpoint);
+    if (!candidates.includes(standardEndpoint)) candidates.push(standardEndpoint);
   } catch {
-    return 'ws://3.108.55.219/worker/stream/websocket';
+    const fallbackWorker = 'ws://3.108.55.219/worker/stream/websocket';
+    const fallbackWs = 'ws://3.108.55.219/ws';
+    if (!candidates.includes(fallbackWorker)) candidates.push(fallbackWorker);
+    if (!candidates.includes(fallbackWs)) candidates.push(fallbackWs);
   }
+
+  return candidates;
 };
 
 type JobRequestListener = (payload: any) => void;
@@ -21,14 +38,15 @@ class WebSocketService {
   private reconnectTimeout: any = null;
   private heartbeatInterval: any = null;
   private reconnectAttempts: number = 0;
-  private maxReconnectAttempts: number = 10;
+  private maxReconnectAttempts: number = 15;
+  private endpointIndex: number = 0;
   private listeners: Set<JobRequestListener> = new Set();
   private currentUserId: string | null = null;
   private currentWorkerId: string | null = null;
   private subscriptionIds: { [dest: string]: string } = {};
 
   /**
-   * Connect to backend STOMP WebSocket broker at /ws
+   * Connect to backend STOMP WebSocket broker with auto endpoint fallback
    */
   connect(userId: string, workerId?: string): void {
     if (!userId) return;
@@ -43,8 +61,9 @@ class WebSocketService {
       return;
     }
 
-    const wsUrl = getWebSocketUrl();
-    console.log('[WebSocketService] Connecting to:', wsUrl);
+    const candidates = getCandidateWebSocketUrls();
+    const wsUrl = candidates[this.endpointIndex % candidates.length];
+    console.log(`[WebSocketService] Connecting to: ${wsUrl} (candidate ${(this.endpointIndex % candidates.length) + 1}/${candidates.length})`);
 
     try {
       this.socket = new WebSocket(wsUrl);
@@ -69,10 +88,12 @@ class WebSocketService {
         console.log(`[WebSocketService] Socket closed. Code: ${event.code}, Reason: ${event.reason}`);
         this.isConnectedState = false;
         this.cleanupHeartbeat();
+        this.endpointIndex++;
         this.scheduleReconnect();
       };
     } catch (e: any) {
       console.warn('[WebSocketService] Connection initiation failed:', e?.message);
+      this.endpointIndex++;
       this.scheduleReconnect();
     }
   }
@@ -254,12 +275,12 @@ class WebSocketService {
   private scheduleReconnect(): void {
     if (this.reconnectTimeout) return;
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.log('[WebSocketService] Max reconnect attempts reached. Waiting for next trigger.');
-      return;
+      console.log('[WebSocketService] Max reconnect attempts reached. Resetting counter for next reconnect attempt.');
+      this.reconnectAttempts = 0;
     }
 
     this.reconnectAttempts++;
-    const delay = Math.min(2000 * Math.pow(1.5, this.reconnectAttempts), 20000);
+    const delay = Math.min(1500 * Math.pow(1.3, this.reconnectAttempts), 15000);
     console.log(`[WebSocketService] Reconnecting in ${Math.round(delay)}ms (Attempt ${this.reconnectAttempts})`);
 
     this.reconnectTimeout = setTimeout(() => {
