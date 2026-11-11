@@ -1,10 +1,11 @@
 import React from 'react';
-import { useLocalSearchParams, useNavigation } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { useAppNavigation } from '../src/navigation/useAppNavigation';
 import { OtpVerificationScreen } from '../src/screens/auth/OtpVerificationScreen';
 
 export default function OtpRoute() {
   const { phone } = useLocalSearchParams<{ phone: string }>();
-  const navigation = useNavigation<any>();
+  const navigation = useAppNavigation() as any;
 
   return (
     <OtpVerificationScreen

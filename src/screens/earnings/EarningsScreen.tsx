@@ -8,7 +8,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useAppNavigation as useNavigation } from '../../navigation/useAppNavigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../../navigation/types';
@@ -21,7 +21,7 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { useApp } from '../../state/AppContext';
 
 export const EarningsScreen: React.FC = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation();
   const { earnings, wallet, fetchEarningsOverview } = useApp();
 
   const [activeTab, setActiveTab] = useState<'Daily' | 'Weekly' | 'Monthly'>('Daily');

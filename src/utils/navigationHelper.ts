@@ -1,4 +1,5 @@
 import { Linking, Platform, Alert } from 'react-native';
+import { router } from 'expo-router';
 
 interface NavigationTarget {
   latitude: number;
@@ -66,18 +67,22 @@ export const openTurnByTurnNavigation = async ({
  * to prevent the unhandled 'GO_BACK' action crash in React Navigation.
  */
 export const safeGoBack = (
-  navigation: any,
+  navigation?: any,
   fallbackRoute: string = 'MainTabs',
   fallbackParams: any = { screen: 'HomeTab' }
 ): void => {
   if (navigation && typeof navigation.canGoBack === 'function' && navigation.canGoBack()) {
     navigation.goBack();
+  } else if (navigation && typeof navigation.navigate === 'function') {
+    navigation.navigate(fallbackRoute, fallbackParams);
   } else if (navigation && typeof navigation.reset === 'function') {
     navigation.reset({
       index: 0,
       routes: [{ name: fallbackRoute, params: fallbackParams }],
     });
-  } else if (navigation && typeof navigation.navigate === 'function') {
-    navigation.navigate(fallbackRoute, fallbackParams);
+  } else if (router.canGoBack()) {
+    router.back();
+  } else {
+    router.replace('/(tabs)');
   }
 };

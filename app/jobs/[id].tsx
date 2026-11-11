@@ -1,11 +1,12 @@
 import React from 'react';
-import { useLocalSearchParams, useNavigation } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { useAppNavigation } from '../../src/navigation/useAppNavigation';
 import { JobDetailsScreen } from '../../src/screens/jobs/JobDetailsScreen';
 import { useWorkerStore } from '../../src/store/useWorkerStore';
 
 export default function JobDetailsRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const navigation = useNavigation<any>();
+  const navigation = useAppNavigation() as any;
   const { activeJob, jobRequests, completedJobs } = useWorkerStore();
 
   const foundJob =

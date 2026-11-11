@@ -9,7 +9,7 @@ import {
   Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useAppNavigation as useNavigation } from '../../navigation/useAppNavigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../../navigation/types';
@@ -23,7 +23,7 @@ import { SecondaryButton } from '../../components/SecondaryButton';
 import { useApp } from '../../state/AppContext';
 
 export const ProfileScreen: React.FC = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation();
   const { worker, services, documents, logout, fetchWorkerProfile } = useApp();
 
   const [isLogoutModalVisible, setIsLogoutModalVisible] = useState(false);

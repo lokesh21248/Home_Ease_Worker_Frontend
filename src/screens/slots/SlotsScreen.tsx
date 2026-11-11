@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useAppNavigation as useNavigation } from '../../navigation/useAppNavigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
@@ -31,7 +31,7 @@ import { ScheduledBookingCard } from '../../components/ScheduledBookingCard';
 type FilterType = 'all' | 'today' | 'tomorrow' | 'upcoming' | 'completed' | 'cancelled';
 
 export const SlotsScreen: React.FC = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation();
 
   const {
     allScheduleSlots = [],

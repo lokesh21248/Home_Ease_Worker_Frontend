@@ -9,7 +9,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useAppNavigation as useNavigation } from '../../navigation/useAppNavigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../../navigation/types';
@@ -26,7 +26,7 @@ import { Job } from '../../types';
 type TabType = 'All' | 'Requests' | 'Active' | 'Scheduled' | 'Completed';
 
 export const JobsTabScreen: React.FC = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation();
   const {
     jobRequests,
     activeJob,

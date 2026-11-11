@@ -11,7 +11,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
+import { useAppNavigation as useNavigation } from '../../navigation/useAppNavigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
@@ -34,7 +35,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { IncomingJobRequestModal } from '../../components/IncomingJobRequestModal';
 
 export const HomeDashboardScreen: React.FC = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation();
   const {
     worker,
     toggleOnlineStatus,

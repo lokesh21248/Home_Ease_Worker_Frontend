@@ -1,10 +1,10 @@
 import React from 'react';
-import { useNavigation } from 'expo-router';
+import { useAppNavigation } from '../../src/navigation/useAppNavigation';
 import { JobCompletionScreen } from '../../src/screens/jobs/JobCompletionScreen';
 import { useWorkerStore } from '../../src/store/useWorkerStore';
 
 export default function JobCompletionRoute() {
-  const navigation = useNavigation<any>();
+  const navigation = useAppNavigation() as any;
   const activeJob = useWorkerStore((s) => s.activeJob);
 
   if (!activeJob) {
