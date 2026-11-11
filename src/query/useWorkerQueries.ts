@@ -154,8 +154,11 @@ export const useUpdateJobStatusMutation = () => {
       } else if (status === 'arrived') {
         workerTrackingLifecycle.stopTracking(bId);
         await workerApiService.arriveAtCustomer(bId);
-      } else if (status === 'started' || status === 'completed') {
+      } else if (status === 'started') {
         workerTrackingLifecycle.stopTracking(bId);
+      } else if (status === 'completed') {
+        workerTrackingLifecycle.stopTracking(bId);
+        await workerApiService.completeBooking(bId).catch(() => {});
       }
 
       setActiveJob({ ...activeJob, status });

@@ -32,7 +32,6 @@ import { BookingRequestCard } from '../../components/BookingRequestCard';
 import { ScheduledBookingCard } from '../../components/ScheduledBookingCard';
 import { SectionHeader } from '../../components/SectionHeader';
 import { EmptyState } from '../../components/EmptyState';
-import { IncomingJobRequestModal } from '../../components/IncomingJobRequestModal';
 
 export const HomeDashboardScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -57,19 +56,9 @@ export const HomeDashboardScreen: React.FC = () => {
   } = useApp();
 
   const [refreshing, setRefreshing] = useState(false);
-  const [incomingModalJob, setIncomingModalJob] = useState<Job | null>(null);
   const [acceptingJobId, setAcceptingJobId] = useState<string | null>(null);
 
   const isOnline = worker.availability.isOnline;
-
-  // Pronto-Style: Auto-trigger incoming urgent modal when an eligible job is dispatched
-  useEffect(() => {
-    if (jobRequests.length > 0 && isOnline && !activeJob) {
-      setIncomingModalJob(jobRequests[0]);
-    } else {
-      setIncomingModalJob(null);
-    }
-  }, [jobRequests, isOnline, activeJob]);
 
   // Re-fetch requests whenever screen comes into focus
   useFocusEffect(
@@ -80,33 +69,6 @@ export const HomeDashboardScreen: React.FC = () => {
       }
     }, [])
   );
-
-  const handleModalAccept = async (job: Job) => {
-    const bookingId = resolveBookingUuid(job.bookingId, job.id);
-    setIncomingModalJob(null);
-    try {
-      await acceptJob(bookingId);
-      navigation.navigate('ActiveJob', {
-        job: { ...job, id: bookingId, bookingId, status: 'accepted' },
-        bookingId,
-      });
-    } catch (err: any) {
-      if (err?.status === 409 || err?.isConflict) {
-        Alert.alert(
-          '⚠️ Job Already Accepted',
-          'Another nearby partner accepted this request faster. Stay online — new jobs are coming in!',
-          [{ text: 'OK' }]
-        );
-      } else {
-        Alert.alert('Notice', err?.message || 'Failed to accept booking.');
-      }
-    }
-  };
-
-  const handleModalReject = (job: Job) => {
-    setIncomingModalJob(null);
-    rejectJob(job.id, 'Partner declined');
-  };
 
   const handleCardAccept = async (job: Job) => {
     const bookingId = resolveBookingUuid(job.bookingId, job.id);
@@ -361,14 +323,7 @@ export const HomeDashboardScreen: React.FC = () => {
         </View>
       </ScrollView>
 
-      {/* 8. Pronto-Style Real-time Incoming Dispatch Modal */}
-      <IncomingJobRequestModal
-        visible={!!incomingModalJob}
-        job={incomingModalJob}
-        onAccept={handleModalAccept}
-        onReject={handleModalReject}
-        countdownSeconds={30}
-      />
+      {/* 8. Incoming job requests are managed by the global RootLayout modal */}
     </SafeAreaView>
   );
 };

@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Switch,
   ActivityIndicator,
+  TouchableOpacity,
   ViewStyle,
 } from 'react-native';
 import { colors } from '../theme/colors';
@@ -39,7 +40,12 @@ export const AvailabilityToggle: React.FC<AvailabilityToggleProps> = ({
   const busy = isLoading || internalLoading;
 
   return (
-    <View style={[styles.card, style]}>
+    <TouchableOpacity
+      style={[styles.card, style]}
+      activeOpacity={0.85}
+      onPress={handleValueChange}
+      disabled={busy}
+    >
       <View style={styles.leftCol}>
         <View style={styles.statusRow}>
           <View
@@ -60,20 +66,19 @@ export const AvailabilityToggle: React.FC<AvailabilityToggleProps> = ({
         </Text>
       </View>
 
-      <View style={styles.switchWrapper}>
+      <View style={styles.switchWrapper} pointerEvents="none">
         {busy ? (
           <ActivityIndicator size="small" color={colors.primary} />
         ) : (
           <Switch
             value={isOnline}
-            onValueChange={handleValueChange}
             trackColor={{ false: '#D1D5DB', true: colors.primary }}
             thumbColor="#FFFFFF"
             ios_backgroundColor="#D1D5DB"
           />
         )}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 };
 

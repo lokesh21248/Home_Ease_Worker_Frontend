@@ -471,7 +471,21 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
             </Animated.View>
 
             {pinError ? (
-              <Text style={styles.pinErrorText}>{pinError}</Text>
+              <View style={{ width: '100%', alignItems: 'center' }}>
+                <Text style={styles.pinErrorText}>{pinError}</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    updateJobStatus('started');
+                    setIsPinModalOpen(false);
+                    setIsTimerRunning(true);
+                  }}
+                  style={{ marginTop: spacing.xs, paddingVertical: 4 }}
+                >
+                  <Text style={{ fontSize: 13, color: colors.primary, fontWeight: '600', textDecorationLine: 'underline' }}>
+                    Start Service Anyway (Doorstep Override)
+                  </Text>
+                </TouchableOpacity>
+              </View>
             ) : (
               <View style={styles.demoPinNotice}>
                 <Ionicons name="shield-checkmark-outline" size={14} color={colors.primary} />

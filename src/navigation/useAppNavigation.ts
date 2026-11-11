@@ -19,13 +19,19 @@ export const useAppNavigation = () => {
           router.push('/jobs/requests');
           break;
         case 'JobDetails':
-          router.push(`/jobs/${params?.job?.id || params?.job?.bookingId}`);
+          router.push(`/jobs/${params?.job?.id || params?.job?.bookingId || params?.bookingId || 'current'}`);
           break;
         case 'JobCompletion':
-          router.push('/jobs/completion');
+          router.push({
+            pathname: '/jobs/completion',
+            params: params ? { bookingId: params.bookingId || params.job?.bookingId || params.job?.id, jobId: params.job?.jobId } : undefined,
+          });
           break;
         case 'NavigationTracking':
-          router.push('/navigation-tracking');
+          router.push({
+            pathname: '/navigation-tracking',
+            params: params ? { bookingId: params.bookingId || params.job?.bookingId || params.job?.id, jobId: params.job?.jobId } : undefined,
+          });
           break;
         case 'Wallet':
           router.push('/wallet');

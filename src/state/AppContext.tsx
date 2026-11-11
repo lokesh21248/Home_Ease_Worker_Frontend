@@ -29,6 +29,7 @@ import { mapBackendBookingToJob } from '../utils/bookingMapper';
 import { locationService, LocationData, GpsStatus } from '../services/locationService';
 import { workerTrackingLifecycle } from '../services/TrackingLifecycleManager';
 import { webSocketService } from '../services/webSocketService';
+import { useWorkerStore } from '../store/useWorkerStore';
 import { Alert } from 'react-native';
 
 interface AppContextType {
@@ -148,6 +149,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [jobRequests, setJobRequests] = useState<Job[]>([]);
   const [activeJob, setActiveJob] = useState<Job | null>(null);
   const [completedJobs, setCompletedJobs] = useState<Job[]>([]);
+
+  // Bidirectional sync with useWorkerStore for unified Expo Router state
+  useEffect(() => {
+    useWorkerStore.getState().setActiveJob(activeJob);
+  }, [activeJob]);
+
+  useEffect(() => {
+    useWorkerStore.getState().setJobRequests(jobRequests);
+  }, [jobRequests]);
+
+  useEffect(() => {
+    useWorkerStore.getState().setCompletedJobs(completedJobs);
+  }, [completedJobs]);
+
+  useEffect(() => {
+    useWorkerStore.getState().setWorker(worker);
+  }, [worker]);
 
   // Financials & Notifications (Purged fake notifications)
   const [earnings, setEarnings] = useState(mockEarningsData);

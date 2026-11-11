@@ -32,33 +32,34 @@ export const ActiveJobCard: React.FC<ActiveJobCardProps> = ({
   const payout = job.netPayout || job.price || 0;
 
   return (
-    <TouchableOpacity
-      style={[styles.card, style]}
-      onPress={onPress}
-      activeOpacity={0.9}
-    >
-      {/* Top Banner */}
-      <View style={styles.topRow}>
-        <View style={styles.badgeWrapper}>
-          <View style={styles.livePulseDot} />
-          <Text style={styles.badgeLabel}>ACTIVE JOB IN PROGRESS</Text>
+    <View style={[styles.card, style]}>
+      {/* Top Banner & Info (Clickable) */}
+      <TouchableOpacity
+        onPress={onPress}
+        activeOpacity={0.85}
+      >
+        <View style={styles.topRow}>
+          <View style={styles.badgeWrapper}>
+            <View style={styles.livePulseDot} />
+            <Text style={styles.badgeLabel}>ACTIVE JOB IN PROGRESS</Text>
+          </View>
+
+          <BookingStatusBadge status={job.status} size="sm" />
         </View>
 
-        <BookingStatusBadge status={job.status} size="sm" />
-      </View>
+        {/* Main Info */}
+        <View style={styles.body}>
+          <Text style={styles.serviceName}>{serviceName}</Text>
+          <Text style={styles.customerName}>For {customerName}</Text>
 
-      {/* Main Info */}
-      <View style={styles.body}>
-        <Text style={styles.serviceName}>{serviceName}</Text>
-        <Text style={styles.customerName}>For {customerName}</Text>
-
-        <View style={styles.locationRow}>
-          <MapPin size={14} color={colors.textSecondary} />
-          <Text style={styles.locationText} numberOfLines={1}>
-            {locationText}
-          </Text>
+          <View style={styles.locationRow}>
+            <MapPin size={14} color={colors.textSecondary} />
+            <Text style={styles.locationText} numberOfLines={1}>
+              {locationText}
+            </Text>
+          </View>
         </View>
-      </View>
+      </TouchableOpacity>
 
       {/* Footer Actions */}
       <View style={styles.footer}>
@@ -89,7 +90,7 @@ export const ActiveJobCard: React.FC<ActiveJobCardProps> = ({
           </TouchableOpacity>
         </View>
       </View>
-    </TouchableOpacity>
+    </View>
   );
 };
 
