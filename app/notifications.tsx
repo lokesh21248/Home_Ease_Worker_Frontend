@@ -4,3 +4,4 @@ import { NotificationsScreen } from '../src/screens/notifications/NotificationsS
 export default function NotificationsRoute() {
   return <NotificationsScreen />;
 }
+

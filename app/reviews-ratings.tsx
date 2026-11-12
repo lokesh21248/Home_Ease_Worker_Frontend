@@ -4,3 +4,4 @@ import { ReviewsRatingsScreen } from '../src/screens/profile/ReviewsRatingsScree
 export default function ReviewsRatingsRoute() {
   return <ReviewsRatingsScreen />;
 }
+
