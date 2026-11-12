@@ -54,6 +54,8 @@ function RootLayoutContent() {
         <Stack.Screen name="navigation-tracking" />
         <Stack.Screen name="login" />
         <Stack.Screen name="otp" />
+        <Stack.Screen name="create-account" />
+        <Stack.Screen name="profile-setup" />
         <Stack.Screen name="bank-details" />
         <Stack.Screen name="support" />
         <Stack.Screen name="settings" />

@@ -44,6 +44,9 @@ export const useAppNavigation = () => {
           else if (params?.screen === 'ProfileTab') router.push('/(tabs)/profile');
           else router.push('/(tabs)');
           break;
+        case 'Earnings':
+          router.push('/(tabs)/earnings');
+          break;
         case 'Notifications':
           router.push('/notifications');
           break;
@@ -52,6 +55,15 @@ export const useAppNavigation = () => {
           break;
         case 'OtpVerification':
           router.push({ pathname: '/otp', params });
+          break;
+        case 'CreateAccount':
+          router.push({
+            pathname: '/create-account',
+            params: params ? { phoneNumber: params.phoneNumber } : undefined,
+          });
+          break;
+        case 'ProfileSetup':
+          router.push('/profile-setup');
           break;
         case 'BankDetails':
           router.push('/bank-details');
@@ -97,9 +109,17 @@ export const useAppNavigation = () => {
     },
     canGoBack: () => router.canGoBack(),
     reset: (options: any) => {
-      const target = options?.routes?.[0]?.name;
-      if (target === 'Login') {
+      const targetRoute = options?.routes?.[0];
+      const targetName = targetRoute?.name;
+      const targetParams = targetRoute?.params;
+      if (targetName === 'Login') {
         router.replace('/login');
+      } else if (targetName === 'MainTabs') {
+        if (targetParams?.screen === 'EarningsTab') router.replace('/(tabs)/earnings');
+        else if (targetParams?.screen === 'JobsTab') router.replace('/(tabs)/jobs');
+        else if (targetParams?.screen === 'SlotsTab') router.replace('/(tabs)/slots');
+        else if (targetParams?.screen === 'ProfileTab') router.replace('/(tabs)/profile');
+        else router.replace('/(tabs)');
       } else {
         router.replace('/(tabs)');
       }

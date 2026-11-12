@@ -45,8 +45,12 @@ export const mapBackendBookingToJob = (item: any): Job => {
       ? item.bookingType
       : item.estimatedArrivalMinutes ? 'INSTANT' : 'SCHEDULED';
 
-  const userLat = Number(item.userLat ?? item.latitude ?? 17.448293);
-  const userLng = Number(item.userLng ?? item.longitude ?? 78.374182);
+  const userLat = Number(
+    item.customerLat ?? item.userLat ?? item.latitude ?? item.location?.latitude ?? 17.448293
+  );
+  const userLng = Number(
+    item.customerLng ?? item.userLng ?? item.longitude ?? item.location?.longitude ?? 78.374182
+  );
 
   const rawAddress =
     item.customerAddress ||
@@ -79,8 +83,8 @@ export const mapBackendBookingToJob = (item: any): Job => {
     jobId: item.jobId || `#HE-${bookingId ? bookingId.slice(0, 4).toUpperCase() : 'REQ'}`,
     customer: {
       id: item.customerId || item.user?.userId || `cust-${bookingId.slice(0, 8)}`,
-      name: item.customerName || item.customer?.name || item.recipientName || 'Customer',
-      phone: item.customerPhone || item.customer?.phone || item.recipientPhone || '',
+      name: item.customerName || item.customer?.name || item.recipientName || item.user?.name || item.user?.fullName || 'Customer',
+      phone: item.customerPhone || item.customer?.phone || item.recipientPhone || item.user?.phone || item.user?.phoneNumber || '',
       avatar: item.customerAvatar || item.customer?.avatar || undefined,
       rating: typeof item.customerRating === 'number' ? item.customerRating : 5.0,
       totalBookings: item.totalBookings ?? 1,
