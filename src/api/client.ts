@@ -7,7 +7,7 @@ export { BASE_API_URL };
 class ApiClient {
   private instance: AxiosInstance;
   private authToken: string | null = null;
-  private userId: string | null = '1270d52d-9f4e-4399-9a80-15cab07f1763';
+  private userId: string | null = null;
 
   constructor() {
     this.instance = axios.create({
@@ -24,21 +24,24 @@ class ApiClient {
     // Request Interceptor (injects JWT auth token & X-User-Id required by backend)
     this.instance.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
-        const uid = this.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
+        const uid = this.getUserId();
 
         if (config.headers) {
-          const authVal = this.authToken ? `Bearer ${this.authToken}` : `Bearer ${uid}`;
-          if (!config.headers.Authorization) {
-            config.headers.Authorization = authVal;
-          }
-          if (!config.headers['X-User-Id']) {
-            config.headers['X-User-Id'] = uid;
-          }
-          if (typeof config.headers.set === 'function') {
-            if (!config.headers.has('Authorization')) {
-              config.headers.set('Authorization', authVal);
+          // Only inject Authorization if we have a real auth token
+          if (this.authToken) {
+            if (!config.headers.Authorization) {
+              config.headers.Authorization = `Bearer ${this.authToken}`;
             }
-            if (!config.headers.has('X-User-Id')) {
+            if (typeof config.headers.set === 'function' && !config.headers.has('Authorization')) {
+              config.headers.set('Authorization', `Bearer ${this.authToken}`);
+            }
+          }
+          // Only inject X-User-Id if we have a valid authenticated user ID
+          if (uid) {
+            if (!config.headers['X-User-Id']) {
+              config.headers['X-User-Id'] = uid;
+            }
+            if (typeof config.headers.set === 'function' && !config.headers.has('X-User-Id')) {
               config.headers.set('X-User-Id', uid);
             }
           }
@@ -85,7 +88,7 @@ class ApiClient {
   }
 
   public getUserId(): string | null {
-    return (this.userId && isValidUuid(this.userId)) ? this.userId : '1270d52d-9f4e-4399-9a80-15cab07f1763';
+    return (this.userId && isValidUuid(this.userId)) ? this.userId : null;
   }
 
   public clearSession() {
