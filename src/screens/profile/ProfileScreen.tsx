@@ -126,7 +126,11 @@ export const ProfileScreen: React.FC = () => {
         {/* Worker Profile Card */}
         <PremiumCard style={styles.card}>
           <View style={styles.avatarRow}>
-            <View style={styles.avatarWrapper}>
+            <TouchableOpacity
+              style={styles.avatarWrapper}
+              activeOpacity={0.8}
+              onPress={() => navigation.navigate('DocumentUpload', { isOnboarding: false })}
+            >
               <Image
                 source={{
                   uri:
@@ -138,7 +142,7 @@ export const ProfileScreen: React.FC = () => {
               <View style={styles.verifiedCheckBadge}>
                 <Ionicons name="checkmark" size={12} color="#FFFFFF" />
               </View>
-            </View>
+            </TouchableOpacity>
 
             <View style={styles.profileMeta}>
               <View style={styles.nameRow}>
@@ -166,17 +170,25 @@ export const ProfileScreen: React.FC = () => {
 
           {/* Quick Metrics Bar */}
           <View style={styles.statsBar}>
-            <View style={styles.statCol}>
+            <TouchableOpacity
+              style={styles.statCol}
+              activeOpacity={0.7}
+              onPress={() => navigation.navigate('MainTabs', { screen: 'JobsTab' })}
+            >
               <Text style={styles.statVal}>{worker.completedJobsCount}</Text>
               <Text style={styles.statLbl}>Completed</Text>
-            </View>
+            </TouchableOpacity>
             <View style={styles.statDivider} />
-            <View style={styles.statCol}>
+            <TouchableOpacity
+              style={styles.statCol}
+              activeOpacity={0.7}
+              onPress={() => navigation.navigate('ReviewsRatings')}
+            >
               <Text style={styles.statValRating}>
                 {worker.rating} ★
               </Text>
               <Text style={styles.statLbl}>Rating</Text>
-            </View>
+            </TouchableOpacity>
             <View style={styles.statDivider} />
             <View style={styles.statCol}>
               <Text style={styles.statVal}>{worker.languages.length}</Text>
@@ -187,12 +199,59 @@ export const ProfileScreen: React.FC = () => {
 
         {/* Selected Services Tags */}
         <PremiumCard style={styles.card}>
-          <Text style={styles.sectionTitle}>Active Service Trades</Text>
+          <View style={styles.sectionHeaderBetween}>
+            <Text style={styles.sectionTitle}>Active Service Trades</Text>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('ServiceSelection', { isOnboarding: false })}
+              style={styles.editLinkBtn}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="pencil" size={12} color={colors.primary} />
+              <Text style={styles.editLinkText}>Manage</Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.serviceChipsRow}>
-            {activeServiceNames.map((s, idx) => (
-              <View key={idx} style={styles.serviceChip}>
-                <Ionicons name="checkmark-circle-outline" size={14} color={colors.primary} />
-                <Text style={styles.serviceChipText}>{s}</Text>
+            {activeServiceNames.length > 0 ? (
+              activeServiceNames.map((s, idx) => (
+                <View key={idx} style={styles.serviceChip}>
+                  <Ionicons name="checkmark-circle-outline" size={14} color={colors.primary} />
+                  <Text style={styles.serviceChipText}>{s}</Text>
+                </View>
+              ))
+            ) : (
+              <TouchableOpacity
+                onPress={() => navigation.navigate('ServiceSelection', { isOnboarding: false })}
+                style={styles.emptyTradesBtn}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="add-circle-outline" size={16} color={colors.primary} />
+                <Text style={styles.emptyTradesText}>+ Add Service Trades</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </PremiumCard>
+
+        {/* Service Areas & Operating Pincodes Preview Card */}
+        <PremiumCard style={styles.card}>
+          <View style={styles.sectionHeaderBetween}>
+            <Text style={styles.sectionTitle}>Operating Pincodes</Text>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('AvailabilitySetup', { isOnboarding: false })}
+              style={styles.editLinkBtn}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="pencil" size={12} color={colors.primary} />
+              <Text style={styles.editLinkText}>Edit Areas</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.pincodeChipsRow}>
+            {(worker.workingPincodes && worker.workingPincodes.length > 0
+              ? worker.workingPincodes
+              : ['500081', '500072', '500032', '500033', '500034', '500104']
+            ).map((code) => (
+              <View key={code} style={styles.pincodeProfileChip}>
+                <Ionicons name="location" size={12} color={colors.primary} />
+                <Text style={styles.pincodeProfileText}>{code}</Text>
               </View>
             ))}
           </View>
@@ -404,6 +463,56 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.textPrimary,
     marginBottom: spacing.md,
+  },
+  sectionHeaderBetween: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
+  editLinkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 2,
+    paddingHorizontal: spacing.xs,
+  },
+  editLinkText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  emptyTradesBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: spacing.xs,
+  },
+  emptyTradesText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  pincodeChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  pincodeProfileChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceAlt,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 4,
+  },
+  pincodeProfileText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textPrimary,
   },
   serviceChipsRow: {
     flexDirection: 'row',

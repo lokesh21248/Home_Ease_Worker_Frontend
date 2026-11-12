@@ -63,6 +63,7 @@ export const AvailabilitySetupScreen: React.FC<Props> = ({ navigation, route }) 
     deleteWorkerTimeOff,
     fetchAvailabilityData,
     toggleOnlineStatus,
+    updateWorkingPincodes,
   } = useApp();
 
   const [selectedDays, setSelectedDays] = useState<string[]>(
@@ -78,6 +79,15 @@ export const AvailabilitySetupScreen: React.FC<Props> = ({ navigation, route }) 
   const [breakEndHour, setBreakEndHour] = useState<string>('02:00 PM');
   const [hasBreak, setHasBreak] = useState<boolean>(true);
   const [isOnline, setIsOnline] = useState<boolean>(worker.availability.isOnline);
+
+  // Operating Pincodes & Service Areas state
+  const [pincodesList, setPincodesList] = useState<string[]>(
+    worker.workingPincodes && worker.workingPincodes.length > 0
+      ? worker.workingPincodes
+      : ['500081', '500072', '500032', '500033', '500034', '500104']
+  );
+  const [newPincode, setNewPincode] = useState('');
+  const [pincodeError, setPincodeError] = useState('');
 
   // Time off modal state
   const [isTimeOffModalVisible, setIsTimeOffModalVisible] = useState(false);
@@ -172,6 +182,29 @@ export const AvailabilitySetupScreen: React.FC<Props> = ({ navigation, route }) 
     setTimeOffEndDate(end.toISOString().split('T')[0]);
   };
 
+  const handleAddPincode = (codeToAdd?: string) => {
+    const code = (codeToAdd || newPincode).trim();
+    if (!/^\d{6}$/.test(code)) {
+      setPincodeError('Pincode must be exactly 6 digits (e.g. 500032)');
+      return;
+    }
+    if (pincodesList.includes(code)) {
+      setPincodeError(`Pincode ${code} is already added`);
+      return;
+    }
+    setPincodesList((prev) => [...prev, code]);
+    setNewPincode('');
+    setPincodeError('');
+  };
+
+  const handleRemovePincode = (codeToRemove: string) => {
+    if (pincodesList.length <= 1) {
+      Alert.alert('Minimum Required', 'At least 1 active working pincode is required for dispatch.');
+      return;
+    }
+    setPincodesList((prev) => prev.filter((p) => p !== codeToRemove));
+  };
+
   const handleFinish = async () => {
     if (isSaving) return;
     setIsSaving(true);
@@ -186,6 +219,9 @@ export const AvailabilitySetupScreen: React.FC<Props> = ({ navigation, route }) 
       if (isOnline !== worker.availability.isOnline) {
         await toggleOnlineStatus();
       }
+
+      // Save pincodes to worker profile & server
+      await updateWorkingPincodes(pincodesList);
 
       const schedulePayload: DaySchedule[] = ALL_DAYS.map((day) => {
         const isAvailable = selectedDays.includes(day.short);
@@ -521,6 +557,89 @@ export const AvailabilitySetupScreen: React.FC<Props> = ({ navigation, route }) 
               </Text>
             </View>
           )}
+        </PremiumCard>
+
+        {/* 5. Service Areas & Operating Pincodes */}
+        <PremiumCard style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Ionicons name="location-outline" size={18} color={colors.primary} />
+            <Text style={styles.cardTitle}>Service Areas & Operating Pincodes</Text>
+          </View>
+          <Text style={styles.cardSub}>
+            Bookings created in these postal pincodes will match and dispatch to your account:
+          </Text>
+
+          {/* Active Pincodes Badges */}
+          <View style={styles.pincodesGrid}>
+            {pincodesList.map((code) => (
+              <View key={code} style={styles.pincodeBadge}>
+                <Ionicons name="location" size={12} color={colors.primary} />
+                <Text style={styles.pincodeText}>{code}</Text>
+                <TouchableOpacity
+                  onPress={() => handleRemovePincode(code)}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  style={styles.pincodeRemoveBtn}
+                >
+                  <Ionicons name="close" size={12} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+
+          {/* Add Pincode Input */}
+          <View style={styles.addPincodeRow}>
+            <TextInput
+              style={styles.pincodeInput}
+              value={newPincode}
+              onChangeText={(text) => {
+                setNewPincode(text);
+                if (pincodeError) setPincodeError('');
+              }}
+              placeholder="Enter 6-digit Pincode (e.g. 500032)"
+              placeholderTextColor={colors.textSecondary}
+              keyboardType="number-pad"
+              maxLength={6}
+            />
+            <TouchableOpacity
+              style={styles.addPincodeBtn}
+              onPress={() => handleAddPincode()}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="add" size={16} color="#FFFFFF" />
+              <Text style={styles.addPincodeBtnText}>Add</Text>
+            </TouchableOpacity>
+          </View>
+          {pincodeError ? <Text style={styles.pincodeErrorText}>{pincodeError}</Text> : null}
+
+          {/* Quick Add Suggestions */}
+          <Text style={styles.quickSlotLabel}>Suggested Areas (Hyderabad):</Text>
+          <View style={styles.presetRow}>
+            {[
+              { code: '500032', name: 'Gachibowli' },
+              { code: '500081', name: 'Hitec City' },
+              { code: '500084', name: 'Kondapur' },
+              { code: '500034', name: 'Banjara Hills' },
+              { code: '500104', name: 'SR Nagar' },
+            ].map((item) => {
+              const alreadyAdded = pincodesList.includes(item.code);
+              return (
+                <TouchableOpacity
+                  key={item.code}
+                  disabled={alreadyAdded}
+                  onPress={() => handleAddPincode(item.code)}
+                  style={[
+                    styles.presetChip,
+                    alreadyAdded && { opacity: 0.5, backgroundColor: colors.background },
+                  ]}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.presetText, alreadyAdded && { color: colors.textSecondary }]}>
+                    {item.code} ({item.name}){alreadyAdded ? ' ✓' : ' +'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </PremiumCard>
       </ScrollView>
 
@@ -957,6 +1076,67 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
     marginTop: spacing.md,
+  },
+  pincodesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginBottom: spacing.md,
+  },
+  pincodeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    gap: 4,
+  },
+  pincodeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  pincodeRemoveBtn: {
+    marginLeft: 2,
+    padding: 2,
+  },
+  addPincodeRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  pincodeInput: {
+    flex: 1,
+    height: 42,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    fontSize: 13,
+    color: colors.textPrimary,
+  },
+  addPincodeBtn: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  addPincodeBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  pincodeErrorText: {
+    fontSize: 11,
+    color: colors.danger,
+    marginBottom: spacing.xs,
   },
   footer: {
     padding: spacing.md,

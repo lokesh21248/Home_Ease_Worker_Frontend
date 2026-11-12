@@ -45,7 +45,7 @@ export const useAppNavigation = () => {
           else router.push('/(tabs)');
           break;
         case 'Notifications':
-          router.push('/(tabs)/jobs');
+          router.push('/notifications');
           break;
         case 'Login':
           router.replace('/login');
@@ -63,16 +63,25 @@ export const useAppNavigation = () => {
           router.push('/settings');
           break;
         case 'DocumentUpload':
-          router.push('/(tabs)/profile');
+          router.push({
+            pathname: '/document-upload',
+            params: params ? { isOnboarding: params.isOnboarding ? 'true' : 'false' } : undefined,
+          });
           break;
         case 'ServiceSelection':
-          router.push('/(tabs)/profile');
+          router.push({
+            pathname: '/service-selection',
+            params: params ? { isOnboarding: params.isOnboarding ? 'true' : 'false' } : undefined,
+          });
           break;
         case 'AvailabilitySetup':
-          router.push('/(tabs)/slots');
+          router.push({
+            pathname: '/availability-setup',
+            params: params ? { isOnboarding: params.isOnboarding ? 'true' : 'false', tab: params.tab } : undefined,
+          });
           break;
         case 'ReviewsRatings':
-          router.push('/(tabs)/profile');
+          router.push('/reviews-ratings');
           break;
         default:
           router.push('/(tabs)');

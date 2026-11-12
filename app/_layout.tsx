@@ -57,6 +57,11 @@ function RootLayoutContent() {
         <Stack.Screen name="bank-details" />
         <Stack.Screen name="support" />
         <Stack.Screen name="settings" />
+        <Stack.Screen name="document-upload" />
+        <Stack.Screen name="service-selection" />
+        <Stack.Screen name="availability-setup" />
+        <Stack.Screen name="reviews-ratings" />
+        <Stack.Screen name="notifications" />
       </Stack>
 
       <IncomingJobRequestModal

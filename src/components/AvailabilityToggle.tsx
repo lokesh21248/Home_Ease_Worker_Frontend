@@ -26,9 +26,14 @@ export const AvailabilityToggle: React.FC<AvailabilityToggleProps> = ({
   style,
 }) => {
   const [internalLoading, setInternalLoading] = useState(false);
+  const lastToggleTimeRef = React.useRef<number>(0);
 
   const handleToggle = async () => {
+    const now = Date.now();
+    if (now - lastToggleTimeRef.current < 450) return;
     if (isLoading || internalLoading) return;
+
+    lastToggleTimeRef.current = now;
     setInternalLoading(true);
     try {
       await onToggle();

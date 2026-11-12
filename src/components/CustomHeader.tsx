@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, StyleProp, ViewStyle } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { borderRadius, shadows, spacing } from '../theme/spacing';
@@ -23,13 +24,25 @@ export const CustomHeader: React.FC<CustomHeaderProps> = ({
   style,
   backgroundColor = '#FFFFFF',
 }) => {
+  const router = useRouter();
+
+  const handleBackPress = () => {
+    if (onBack) {
+      onBack();
+    } else if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(tabs)');
+    }
+  };
+
   return (
     <View style={[styles.container, { backgroundColor }, style]}>
       <View style={styles.leftRow}>
         {showBack ? (
           <TouchableOpacity
             activeOpacity={0.7}
-            onPress={onBack}
+            onPress={handleBackPress}
             style={styles.backBtn}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >

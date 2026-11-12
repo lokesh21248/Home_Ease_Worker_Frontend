@@ -44,8 +44,8 @@ export const JobsTabScreen: React.FC = () => {
     setIsRefreshing(true);
     try {
       await Promise.all([
-        fetchJobRequests().catch(() => {}),
-        fetchSchedules().catch(() => {}),
+        fetchJobRequests().catch(() => { }),
+        fetchSchedules().catch(() => { }),
       ]);
     } finally {
       setIsRefreshing(false);
@@ -219,8 +219,8 @@ export const JobsTabScreen: React.FC = () => {
               activeTab === 'Requests'
                 ? 'No pending service requests right now. Stay online to receive instant bookings nearby.'
                 : activeTab === 'Active'
-                ? 'No service job currently in progress. Accept an incoming request to start.'
-                : `You currently do not have any bookings under "${activeTab}".`
+                  ? 'No service job currently in progress. Accept an incoming request to start.'
+                  : `You currently do not have any bookings under "${activeTab}".`
             }
             actionLabel={activeTab === 'Requests' ? 'Refresh Requests' : undefined}
             onAction={activeTab === 'Requests' ? handleRefresh : undefined}
