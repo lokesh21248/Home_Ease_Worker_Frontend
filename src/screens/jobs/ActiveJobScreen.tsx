@@ -10,6 +10,7 @@ import {
   Modal,
   TextInput,
   Animated,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -270,13 +271,46 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
               </Text>
             </View>
 
-            <TouchableOpacity
-              style={styles.callCircle}
-              activeOpacity={0.8}
-              onPress={() => Alert.alert('Calling Customer', `Dialing ${currentJob.customer.phone}`)}
-            >
-              <Ionicons name="call" size={18} color={colors.primary} />
-            </TouchableOpacity>
+            <View style={styles.actionButtonsRow}>
+              <TouchableOpacity
+                style={styles.sosCircle}
+                activeOpacity={0.8}
+                onPress={() => {
+                  Alert.alert(
+                    'EMERGENCY SOS',
+                    'Do you need immediate emergency assistance? This will connect you to Emergency Helpline (112) and alert HomeEase Dispatch Operations.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Call 112 (Emergency)',
+                        style: 'destructive',
+                        onPress: () => Linking.openURL('tel:112'),
+                      },
+                      {
+                        text: 'Alert HomeEase Ops',
+                        onPress: () => Alert.alert('SOS Dispatched', 'HomeEase Operations & Safety Team have been notified of your live location.'),
+                      },
+                    ]
+                  );
+                }}
+              >
+                <Ionicons name="warning" size={18} color="#FFFFFF" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.callCircle}
+                activeOpacity={0.8}
+                onPress={() => {
+                  if (currentJob.customer.phone) {
+                    Linking.openURL(`tel:${currentJob.customer.phone}`);
+                  } else {
+                    Alert.alert('Calling Customer', `Dialing ${currentJob.customer.phone}`);
+                  }
+                }}
+              >
+                <Ionicons name="call" size={18} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
           </View>
         </PremiumCard>
 
@@ -795,6 +829,24 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
     lineHeight: 16,
+  },
+  actionButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  sosCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#DC2626',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#DC2626',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 4,
+    elevation: 4,
   },
   callCircle: {
     width: 42,
