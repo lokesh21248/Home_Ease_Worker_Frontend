@@ -25,18 +25,19 @@ class ApiClient {
     this.instance.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
         const uid = this.getUserId();
+        const tokenOrUid = this.authToken || uid;
 
         if (config.headers) {
-          // Only inject Authorization if we have a real auth token
-          if (this.authToken) {
+          // Inject Authorization header: use signed JWT authToken if available, or fall back to authenticated UUID
+          if (tokenOrUid) {
             if (!config.headers.Authorization) {
-              config.headers.Authorization = `Bearer ${this.authToken}`;
+              config.headers.Authorization = `Bearer ${tokenOrUid}`;
             }
             if (typeof config.headers.set === 'function' && !config.headers.has('Authorization')) {
-              config.headers.set('Authorization', `Bearer ${this.authToken}`);
+              config.headers.set('Authorization', `Bearer ${tokenOrUid}`);
             }
           }
-          // Only inject X-User-Id if we have a valid authenticated user ID
+          // Inject X-User-Id if we have a valid authenticated user ID
           if (uid) {
             if (!config.headers['X-User-Id']) {
               config.headers['X-User-Id'] = uid;
