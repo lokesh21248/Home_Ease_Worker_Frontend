@@ -1,5 +1,5 @@
-export const BASE_API_URL = 'http://3.108.55.219/api/v1';
-export const BASE_TRACKING_URL = 'http://3.108.55.219/api/v1';
+export const BASE_API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://3-108-55-219.sslip.io/api/v1';
+export const BASE_TRACKING_URL = process.env.EXPO_PUBLIC_TRACKING_API_URL || BASE_API_URL;
 
 export const API_ENDPOINTS = {
   // 1. Worker Auth & Registration

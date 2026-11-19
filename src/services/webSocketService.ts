@@ -21,8 +21,8 @@ const getCandidateWebSocketUrls = (): string[] => {
     if (!candidates.includes(workerEndpoint)) candidates.push(workerEndpoint);
     if (!candidates.includes(standardEndpoint)) candidates.push(standardEndpoint);
   } catch {
-    const fallbackWorker = 'ws://3.108.55.219/worker/stream/websocket';
-    const fallbackWs = 'ws://3.108.55.219/ws';
+    const fallbackWorker = 'wss://3-108-55-219.sslip.io/worker/stream/websocket';
+    const fallbackWs = 'wss://3-108-55-219.sslip.io/ws';
     if (!candidates.includes(fallbackWorker)) candidates.push(fallbackWorker);
     if (!candidates.includes(fallbackWs)) candidates.push(fallbackWs);
   }
