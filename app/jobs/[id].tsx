@@ -1,5 +1,5 @@
-import React from 'react';
-import { View } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useAppNavigation } from '../../src/navigation/useAppNavigation';
 import { JobDetailsScreen } from '../../src/screens/jobs/JobDetailsScreen';
@@ -7,6 +7,9 @@ import { useWorkerStore } from '../../src/store/useWorkerStore';
 import { useApp } from '../../src/state/AppContext';
 import { CustomHeader } from '../../src/components/CustomHeader';
 import { EmptyState } from '../../src/components/EmptyState';
+import { workerApiService } from '../../src/api/workerApiService';
+import { mapBackendBookingToJob } from '../../src/utils/bookingMapper';
+import { Job } from '../../src/types';
 
 export default function JobDetailsRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -23,11 +26,43 @@ export default function JobDetailsRoute() {
     ...storeCompleted,
   ];
 
-  const foundJob =
+  const inMemoryJob =
     allJobs.find((j) => j.id === id || j.bookingId === id || j.jobId === id) ||
     appActive ||
     storeActive ||
-    (allJobs.length > 0 ? allJobs[0] : null);
+    null;
+
+  const [job, setJob] = useState<Job | null>(inMemoryJob);
+  const [loading, setLoading] = useState<boolean>(!inMemoryJob && !!id);
+
+  useEffect(() => {
+    if (!inMemoryJob && id) {
+      let isMounted = true;
+      setLoading(true);
+      workerApiService.getBookingDetails(id)
+        .then((data) => {
+          if (isMounted && data) {
+            setJob(mapBackendBookingToJob(data));
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          if (isMounted) setLoading(false);
+        });
+
+      return () => { isMounted = false; };
+    }
+  }, [id, inMemoryJob]);
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#F4F7FC', justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#1A56DB" />
+      </View>
+    );
+  }
+
+  const foundJob = job || (allJobs.length > 0 ? allJobs[0] : null);
 
   if (!foundJob) {
     return (

@@ -259,6 +259,11 @@ export const SlotsScreen: React.FC = () => {
                   scheduledDate={slot.scheduledAt?.split('T')[0]}
                   locality={slot.address || 'Hyderabad'}
                   status={slot.status || 'SCHEDULED'}
+                  onPress={() => {
+                    if (slot.bookingId) {
+                      navigation.navigate('JobDetails', { bookingId: slot.bookingId });
+                    }
+                  }}
                   style={{ marginBottom: spacing.md }}
                 />
               );
