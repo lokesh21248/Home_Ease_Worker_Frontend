@@ -116,9 +116,9 @@ export const SlotsScreen: React.FC = () => {
   const handleToggleSlot = (slot: WorkerScheduleSlot) => {
     const currentAvailable = slot.isAvailable ?? true;
     const nextState = !currentAvailable;
-
-    if (slot.bookingId) {
-      setSlotAvailability(slot.bookingId, nextState);
+    const targetKey = slot.bookingId || slot.scheduledAt || '';
+    if (targetKey) {
+      setSlotAvailability(targetKey, nextState);
     }
   };
 

@@ -124,7 +124,8 @@ export const JobsTabScreen: React.FC = () => {
   };
 
   const handleReject = (item: Job) => {
-    rejectJob(item.id);
+    const bookingId = resolveBookingUuid(item.bookingId, item.id);
+    rejectJob(bookingId);
   };
 
   const handleNavigate = (item: Job) => {

@@ -50,6 +50,9 @@ export const useAppNavigation = () => {
         case 'Notifications':
           router.push('/notifications');
           break;
+        case 'Splash':
+          router.push('/splash');
+          break;
         case 'Login':
           router.replace('/login');
           break;
@@ -114,6 +117,8 @@ export const useAppNavigation = () => {
       const targetParams = targetRoute?.params;
       if (targetName === 'Login') {
         router.replace('/login');
+      } else if (targetName === 'Splash') {
+        router.replace('/splash');
       } else if (targetName === 'MainTabs') {
         if (targetParams?.screen === 'EarningsTab') router.replace('/(tabs)/earnings');
         else if (targetParams?.screen === 'JobsTab') router.replace('/(tabs)/jobs');

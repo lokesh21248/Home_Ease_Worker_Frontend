@@ -420,9 +420,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           await fetchWorkerProfile().catch(() => {});
         }
 
-        const cachedJob = await storageService.loadActiveJob();
-        if (cachedJob && cachedJob.status !== 'completed' && cachedJob.status !== 'cancelled') {
-          setActiveJob(cachedJob);
+        let restoredJob: Job | null = null;
+        try {
+          const serverJobs = await workerApiService.getWorkerJobs();
+          const ongoing = serverJobs.find((j: any) =>
+            ['accepted', 'travelling', 'on_the_way', 'arrived', 'started', 'in_progress'].includes(
+              String(j.status).toLowerCase()
+            )
+          );
+          if (ongoing) {
+            restoredJob = mapBackendBookingToJob(ongoing);
+          }
+        } catch {}
+
+        if (!restoredJob) {
+          const cachedJob = await storageService.loadActiveJob();
+          if (cachedJob && cachedJob.status !== 'completed' && cachedJob.status !== 'cancelled') {
+            restoredJob = cachedJob;
+          }
+        }
+
+        if (restoredJob) {
+          setActiveJob(restoredJob);
+          await storageService.saveActiveJob(restoredJob);
+        } else {
+          setActiveJob(null);
+          await storageService.clearActiveJob();
         }
         const cachedDuty = await storageService.loadDutyStatus();
         if (cachedDuty !== null) {
@@ -541,8 +564,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const updated = exists
         ? prev.selectedServices.filter((id) => id !== serviceId)
         : [...prev.selectedServices, serviceId];
-      workerApiService.updateWorkerServices(updated).catch(() => {});
-      return { ...prev, selectedServices: updated };
+
+      const allSelectedSubServiceIds: string[] = [];
+      services.forEach((s) => {
+        if (updated.includes(s.id) && s.subServices) {
+          s.subServices.forEach((sub) => allSelectedSubServiceIds.push(sub.id));
+        }
+      });
+
+      workerApiService
+        .updateWorkerServices(updated, allSelectedSubServiceIds, prev.workingPincodes)
+        .catch(() => {});
+
+      return { ...prev, selectedServices: updated, subServiceIds: allSelectedSubServiceIds };
     });
   };
 
@@ -555,7 +589,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const cleaned = pincodes
         .map((p) => p.trim())
         .filter((p) => /^\d{6}$/.test(p));
-      await workerApiService.updateWorkerServices(undefined, undefined, cleaned);
+      await workerApiService.updateWorkerServices(worker.selectedServices, undefined, cleaned);
       setWorkingPincodes(cleaned);
       setWorker((prev) => ({
         ...prev,
@@ -773,10 +807,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const setSlotAvailability = (bookingId: string, isAvailable: boolean) => {
+  const setSlotAvailability = (identifier: string, isAvailable: boolean) => {
     setAllScheduleSlots((prev) =>
       prev.map((slot) =>
-        slot.bookingId === bookingId
+        (slot.bookingId === identifier || slot.scheduledAt === identifier)
           ? { ...slot, isAvailable, status: isAvailable ? 'SCHEDULED' : 'CANCELLED' }
           : slot
       )
@@ -1079,6 +1113,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const bId = resolveBookingUuid(activeJob.bookingId, activeJob.id);
     if (newStatus === 'travelling') {
       workerApiService.startTravelling(bId).catch((e) => console.warn('[AppContext] startTravelling:', e?.message));
+      const custLat = activeJob.location?.latitude;
+      const custLng = activeJob.location?.longitude;
+      workerTrackingLifecycle.startTravelTracking(
+        bId,
+        (loc) => setWorkerLocation({ lat: loc.latitude, lng: loc.longitude }),
+        undefined,
+        custLat && custLng ? { latitude: custLat, longitude: custLng } : undefined
+      );
     } else if (newStatus === 'arrived') {
       workerTrackingLifecycle.stopTracking(bId);
       if (activeJob.status !== 'arrived') {

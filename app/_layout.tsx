@@ -46,6 +46,7 @@ function RootLayoutContent() {
         }}
       >
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="splash" />
         <Stack.Screen name="jobs/active" />
         <Stack.Screen name="jobs/requests" />
         <Stack.Screen name="jobs/[id]" />

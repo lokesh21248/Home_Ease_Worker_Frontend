@@ -18,6 +18,7 @@ import { CustomHeader } from '../../components/CustomHeader';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { useApp } from '../../state/AppContext';
 import { safeGoBack } from '../../utils/navigationHelper';
+import { workerApiService } from '../../api/workerApiService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ServiceSelection'>;
 
@@ -38,12 +39,17 @@ export const ServiceSelectionScreen: React.FC<Props> = ({ navigation, route }) =
       }
     });
 
+    const subIds =
+      allSelectedSubServiceIds.length > 0
+        ? allSelectedSubServiceIds
+        : ['c34b4032-95ed-4ed5-b5e9-a7f5ab8cd4f7', '63fa806f-d1f3-4f92-aa7f-527c86c899ce'];
+
     updateWorkerProfile({
-      subServiceIds:
-        allSelectedSubServiceIds.length > 0
-          ? allSelectedSubServiceIds
-          : ['c34b4032-95ed-4ed5-b5e9-a7f5ab8cd4f7', '63fa806f-d1f3-4f92-aa7f-527c86c899ce'],
+      subServiceIds: subIds,
     });
+
+    // Persist selected service skills to backend
+    workerApiService.updateWorkerServices(worker.selectedServices, subIds).catch(() => {});
 
     if (isOnboarding) {
       navigation.navigate('AvailabilitySetup', { isOnboarding: true });

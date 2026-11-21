@@ -72,7 +72,7 @@ export const JobRequestsScreen: React.FC = () => {
         {
           text: 'Decline',
           style: 'destructive',
-          onPress: () => rejectJob(job.id, 'Partner unavailable'),
+          onPress: () => rejectJob(resolveBookingUuid(job.bookingId, job.id), 'Partner unavailable'),
         },
       ]
     );

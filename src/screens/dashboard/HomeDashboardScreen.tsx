@@ -288,7 +288,11 @@ export const HomeDashboardScreen: React.FC = () => {
         <View style={styles.performanceCard}>
           <Text style={styles.perfTitle}>Partner Performance</Text>
           <View style={styles.perfGrid}>
-            <View style={styles.perfItem}>
+            <TouchableOpacity
+              style={styles.perfItem}
+              activeOpacity={0.7}
+              onPress={() => navigation.navigate('ReviewsRatings')}
+            >
               <View style={styles.perfIconBox}>
                 <Ionicons name="star" size={16} color={colors.warning} />
               </View>
@@ -296,11 +300,15 @@ export const HomeDashboardScreen: React.FC = () => {
                 {dashboardMetrics.averageRating || worker.rating || '5.0'}
               </Text>
               <Text style={styles.perfLabel}>Rating ({worker.totalReviews || 0})</Text>
-            </View>
+            </TouchableOpacity>
 
             <View style={styles.perfDivider} />
 
-            <View style={styles.perfItem}>
+            <TouchableOpacity
+              style={styles.perfItem}
+              activeOpacity={0.7}
+              onPress={() => navigation.navigate('MainTabs', { screen: 'JobsTab' })}
+            >
               <View style={styles.perfIconBox}>
                 <Ionicons name="checkmark-done-circle" size={16} color={colors.success} />
               </View>
@@ -308,7 +316,7 @@ export const HomeDashboardScreen: React.FC = () => {
                 {dashboardMetrics.completedJobs || worker.completedJobsCount || 0}
               </Text>
               <Text style={styles.perfLabel}>Jobs Done</Text>
-            </View>
+            </TouchableOpacity>
 
             <View style={styles.perfDivider} />
 

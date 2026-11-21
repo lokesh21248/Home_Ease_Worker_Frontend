@@ -4,7 +4,7 @@ import { useAppNavigation } from '../src/navigation/useAppNavigation';
 import { OtpVerificationScreen } from '../src/screens/auth/OtpVerificationScreen';
 
 export default function OtpRoute() {
-  const { phone } = useLocalSearchParams<{ phone: string }>();
+  const params = useLocalSearchParams<{ phone?: string; phoneNumber?: string; countryCode?: string }>();
   const navigation = useAppNavigation() as any;
 
   return (
@@ -13,8 +13,8 @@ export default function OtpRoute() {
         key: 'otp-screen',
         name: 'OtpVerification',
         params: {
-          phoneNumber: phone || '9876543210',
-          countryCode: '+91',
+          phoneNumber: params.phoneNumber || params.phone || '9876543210',
+          countryCode: params.countryCode || '+91',
         },
       }}
       navigation={navigation}

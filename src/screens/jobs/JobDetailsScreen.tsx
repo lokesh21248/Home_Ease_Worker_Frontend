@@ -62,7 +62,8 @@ export const JobDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           text: 'Decline',
           style: 'destructive',
           onPress: () => {
-            rejectJob(job.id);
+            const bookingId = resolveBookingUuid(job.bookingId, job.id);
+            rejectJob(bookingId);
             safeGoBack(navigation, 'MainTabs', { screen: 'JobsTab' });
           },
         },

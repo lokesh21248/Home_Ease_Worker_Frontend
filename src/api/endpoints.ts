@@ -50,6 +50,7 @@ export const API_ENDPOINTS = {
     ADD_SUB_SERVICE: (bookingId: string) => `/workers/bookings/${bookingId}/add-sub-service`,
     COMPLETE: (bookingId: string) => `/workers/bookings/${bookingId}/complete`,
     REQUESTS: '/workers/bookings/requests',
+    JOBS: '/workers/me/jobs',
     DETAILS: (bookingId: string) => `/bookings/${bookingId}`,
     HISTORY: (bookingId: string) => `/bookings/${bookingId}/history`,
   },

@@ -508,6 +508,23 @@ class WorkerApiService {
   }
 
   /**
+   * 4.0b Get Worker Assigned Bookings: GET /workers/me/jobs
+   */
+  public async getWorkerJobs(): Promise<any[]> {
+    const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
+    try {
+      const response = await apiClient.get<any[]>(API_ENDPOINTS.BOOKINGS.JOBS, {
+        headers: { 'X-User-Id': activeUserId },
+        params: { userId: activeUserId },
+      });
+      const data = (response.data as any)?.data ?? response.data;
+      return Array.isArray(data) ? data : [];
+    } catch (error: any) {
+      return [];
+    }
+  }
+
+  /**
    * 4.1 Accept Assigned Booking: POST /workers/stream/bookings/{id}/accept
    * Atomic winner check — protected against concurrent race conditions
    */

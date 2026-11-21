@@ -152,13 +152,23 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
     if (isArriving) return;
     setIsArriving(true);
 
-    // CRITICAL: Immediately stop booking travel GPS collection and uploads
-    workerTrackingLifecycle.stopTracking(bookingId);
-    alertFeedbackService.playSuccessFeedback();
+    try {
+      // 1. Immediately stop booking travel GPS collection and uploads
+      workerTrackingLifecycle.stopTracking(bookingId);
+      alertFeedbackService.playSuccessFeedback();
 
-    updateJobStatus('arrived');
-    setIsArriving(false);
-    navigation.navigate('ActiveJob', { job: { ...job, bookingId, status: 'arrived' }, bookingId });
+      // 2. Update local state — AppContext.updateJobStatus('arrived') internally calls
+      //    workerApiService.arriveAtCustomer() with an idempotency guard, so we do NOT
+      //    call it separately here to avoid a duplicate backend request.
+      updateJobStatus('arrived');
+      navigation.navigate('ActiveJob', { job: { ...job, bookingId, status: 'arrived' }, bookingId });
+    } catch (err: any) {
+      console.warn('[NavigationTrackingScreen] arrived notice:', err?.message);
+      updateJobStatus('arrived');
+      navigation.navigate('ActiveJob', { job: { ...job, bookingId, status: 'arrived' }, bookingId });
+    } finally {
+      setIsArriving(false);
+    }
   };
 
   return (

@@ -30,6 +30,9 @@ import { LocationCard } from '../../components/LocationCard';
 import { useApp } from '../../state/AppContext';
 import { openTurnByTurnNavigation } from '../../utils/navigationHelper';
 import { resolveBookingUuid } from '../../utils/uuid';
+import { storageService } from '../../services/storageService';
+import { workerApiService } from '../../api/workerApiService';
+import { workerTrackingLifecycle } from '../../services/TrackingLifecycleManager';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ActiveJob'>;
 
@@ -43,9 +46,48 @@ const STATUS_STEPS: { key: JobStatus; label: string; icon: keyof typeof Ionicons
 
 export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
   const initialJob = route.params?.job;
-  const { activeJob, updateJobStatus, services, verifyJobPin, addSubServiceToJob } = useApp();
+  const {
+    activeJob,
+    updateJobStatus,
+    services,
+    verifyJobPin,
+    addSubServiceToJob,
+    rejectJob,
+    setActiveJobDirectly,
+  } = useApp();
 
   const currentJob: Job | null = activeJob || initialJob || null;
+
+  useEffect(() => {
+    if (!activeJob && initialJob) {
+      setActiveJobDirectly(initialJob);
+    }
+  }, [activeJob, initialJob, setActiveJobDirectly]);
+
+  const resolvedBookingId = resolveBookingUuid(
+    (route.params as any)?.bookingId,
+    (route.params as any)?.booking?.bookingId,
+    (route.params as any)?.booking?.id,
+    currentJob?.bookingId,
+    currentJob?.id
+  );
+
+  const handleStartTravelling = () => {
+    // updateJobStatus('travelling') calls workerApiService.startTravelling() internally
+    updateJobStatus('travelling');
+  };
+
+  const handleMarkArrived = async () => {
+    // Stop GPS tracking immediately (before backend call)
+    try {
+      workerTrackingLifecycle.stopTracking(resolvedBookingId);
+    } catch (e: any) {
+      console.warn('[ActiveJobScreen] stopTracking:', e?.message);
+    }
+    // updateJobStatus('arrived') already calls arriveAtCustomer internally via AppContext
+    // so we do NOT call arriveAtCustomer here to avoid a duplicate backend request
+    updateJobStatus('arrived');
+  };
 
   // Live Stopwatch timer
   const [secondsElapsed, setSecondsElapsed] = useState<number>(0);
@@ -167,6 +209,29 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
     }
   };
 
+  const handleCancelOrReleaseJob = () => {
+    Alert.alert(
+      'Release / Cancel Active Job',
+      'Are you sure you want to release or cancel this job? It will be removed from your active jobs so you can receive new instant requests.',
+      [
+        { text: 'Keep Job', style: 'cancel' },
+        {
+          text: 'Release Job',
+          style: 'destructive',
+          onPress: async () => {
+            const bookingId = resolveBookingUuid(currentJob?.bookingId, currentJob?.id);
+            try {
+              await rejectJob(bookingId, 'Partner released job');
+            } catch {}
+            setActiveJobDirectly(null);
+            storageService.clearActiveJob();
+            navigation.navigate('MainTabs', { screen: 'HomeTab' });
+          },
+        },
+      ]
+    );
+  };
+
   const getStepIndex = (status: JobStatus) => {
     return STATUS_STEPS.findIndex((s) => s.key === status);
   };
@@ -200,6 +265,16 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
         subtitle={currentJob.serviceName}
         showBack
         onBack={() => navigation.navigate('MainTabs', { screen: 'HomeTab' })}
+        rightAction={
+          <TouchableOpacity
+            style={styles.cancelJobHeaderBtn}
+            onPress={handleCancelOrReleaseJob}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="close-circle-outline" size={16} color={colors.danger} />
+            <Text style={styles.cancelJobHeaderText}>Release</Text>
+          </TouchableOpacity>
+        }
       />
 
       <ScrollView
@@ -422,7 +497,7 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
             title="Start Travelling to Customer"
             size="lg"
             fullWidth
-            onPress={() => updateJobStatus('travelling')}
+            onPress={handleStartTravelling}
             icon={<Ionicons name="bicycle-outline" size={20} color="#FFFFFF" />}
           />
         )}
@@ -432,7 +507,7 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
             title="I Have Arrived at Location"
             size="lg"
             fullWidth
-            onPress={() => updateJobStatus('arrived')}
+            onPress={handleMarkArrived}
             icon={<Ionicons name="location-outline" size={20} color="#FFFFFF" />}
           />
         )}
@@ -1195,6 +1270,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: colors.textPrimary,
+  },
+  cancelJobHeaderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.dangerLight,
+  },
+  cancelJobHeaderText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.danger,
   },
 });
 
