@@ -17,6 +17,7 @@ interface LocationCardProps {
   distanceKm?: number;
   etaMinutes?: number;
   onNavigate?: () => void;
+  onInAppNavigate?: () => void;
   onCall?: () => void;
   customerPhone?: string;
   style?: ViewStyle;
@@ -28,6 +29,7 @@ export const LocationCard: React.FC<LocationCardProps> = ({
   distanceKm,
   etaMinutes,
   onNavigate,
+  onInAppNavigate,
   onCall,
   customerPhone,
   style,
@@ -59,14 +61,27 @@ export const LocationCard: React.FC<LocationCardProps> = ({
 
       {/* Action Buttons */}
       <View style={styles.actionsRow}>
+        {onInAppNavigate && (
+          <TouchableOpacity
+            style={styles.inAppNavBtn}
+            onPress={onInAppNavigate}
+            activeOpacity={0.85}
+          >
+            <Navigation size={14} color={colors.textInverse} />
+            <Text style={styles.inAppNavBtnText}>Live GPS</Text>
+          </TouchableOpacity>
+        )}
+
         {onNavigate && (
           <TouchableOpacity
-            style={styles.navBtn}
+            style={[styles.navBtn, Boolean(onInAppNavigate) && styles.navBtnSecondary]}
             onPress={onNavigate}
             activeOpacity={0.85}
           >
-            <Navigation size={15} color={colors.textInverse} />
-            <Text style={styles.navBtnText}>Google Maps</Text>
+            <Navigation size={14} color={onInAppNavigate ? colors.primary : colors.textInverse} />
+            <Text style={[styles.navBtnText, Boolean(onInAppNavigate) && styles.navBtnSecondaryText]}>
+              Maps
+            </Text>
           </TouchableOpacity>
         )}
 
@@ -76,8 +91,8 @@ export const LocationCard: React.FC<LocationCardProps> = ({
             onPress={onCall}
             activeOpacity={0.8}
           >
-            <Phone size={15} color={colors.primary} />
-            <Text style={styles.callBtnText}>Call Customer</Text>
+            <Phone size={14} color={colors.primary} />
+            <Text style={styles.callBtnText}>Call</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -140,11 +155,26 @@ const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing.sm,
     marginTop: spacing.md,
     paddingTop: spacing.md,
     borderTopWidth: 1,
     borderTopColor: colors.borderLight,
+  },
+  inAppNavBtn: {
+    flex: 1.2,
+    height: 42,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+  },
+  inAppNavBtnText: {
+    fontSize: typography.fontSize.xs,
+    fontFamily: typography.fontFamily.bold,
+    color: colors.textInverse,
   },
   navBtn: {
     flex: 1,
@@ -154,15 +184,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 5,
+  },
+  navBtnSecondary: {
+    backgroundColor: colors.secondary,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   navBtnText: {
     fontSize: typography.fontSize.xs,
     fontFamily: typography.fontFamily.bold,
     color: colors.textInverse,
   },
+  navBtnSecondaryText: {
+    color: colors.primary,
+  },
   callBtn: {
-    flex: 1,
+    flex: 0.9,
     height: 42,
     borderRadius: borderRadius.md,
     backgroundColor: colors.secondary,
@@ -171,7 +209,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 5,
   },
   callBtnText: {
     fontSize: typography.fontSize.xs,

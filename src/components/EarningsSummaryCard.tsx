@@ -17,6 +17,9 @@ interface EarningsSummaryCardProps {
   activeJobsCount?: number;
   pendingRequestsCount?: number;
   onPressViewDetails?: () => void;
+  onPressCompletedJobs?: () => void;
+  onPressActiveJobs?: () => void;
+  onPressIncomingRequests?: () => void;
   style?: ViewStyle;
 }
 
@@ -26,6 +29,9 @@ export const EarningsSummaryCard: React.FC<EarningsSummaryCardProps> = ({
   activeJobsCount = 0,
   pendingRequestsCount = 0,
   onPressViewDetails,
+  onPressCompletedJobs,
+  onPressActiveJobs,
+  onPressIncomingRequests,
   style,
 }) => {
   return (
@@ -65,28 +71,43 @@ export const EarningsSummaryCard: React.FC<EarningsSummaryCardProps> = ({
 
       {/* Sub-Metrics Row */}
       <View style={styles.statsRow}>
-        <View style={styles.statBox}>
+        <TouchableOpacity
+          style={styles.statBox}
+          onPress={onPressCompletedJobs}
+          disabled={!onPressCompletedJobs}
+          activeOpacity={0.7}
+        >
           <Text style={styles.statValue}>{completedJobsCount}</Text>
           <Text style={styles.statLabel}>Jobs Completed</Text>
-        </View>
+        </TouchableOpacity>
 
         <View style={styles.statDivider} />
 
-        <View style={styles.statBox}>
+        <TouchableOpacity
+          style={styles.statBox}
+          onPress={onPressActiveJobs}
+          disabled={!onPressActiveJobs}
+          activeOpacity={0.7}
+        >
           <Text style={[styles.statValue, { color: activeJobsCount > 0 ? colors.primary : colors.textPrimary }]}>
             {activeJobsCount}
           </Text>
           <Text style={styles.statLabel}>Active Now</Text>
-        </View>
+        </TouchableOpacity>
 
         <View style={styles.statDivider} />
 
-        <View style={styles.statBox}>
+        <TouchableOpacity
+          style={styles.statBox}
+          onPress={onPressIncomingRequests}
+          disabled={!onPressIncomingRequests}
+          activeOpacity={0.7}
+        >
           <Text style={[styles.statValue, { color: pendingRequestsCount > 0 ? colors.warning : colors.textPrimary }]}>
             {pendingRequestsCount}
           </Text>
           <Text style={styles.statLabel}>Incoming</Text>
-        </View>
+        </TouchableOpacity>
       </View>
     </View>
   );

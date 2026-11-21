@@ -396,6 +396,9 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
           distanceKm={currentJob.location.distanceKm}
           etaMinutes={currentJob.estimatedArrivalMinutes}
           customerPhone={currentJob.customer.phone}
+          onInAppNavigate={() =>
+            navigation.navigate('NavigationTracking', { job: currentJob, bookingId: resolvedBookingId })
+          }
           onNavigate={() =>
             openTurnByTurnNavigation({
               latitude: currentJob.location.latitude,
@@ -503,13 +506,25 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
         )}
 
         {currentJob.status === 'travelling' && (
-          <PrimaryButton
-            title="I Have Arrived at Location"
-            size="lg"
-            fullWidth
-            onPress={handleMarkArrived}
-            icon={<Ionicons name="location-outline" size={20} color="#FFFFFF" />}
-          />
+          <View style={{ width: '100%' }}>
+            <PrimaryButton
+              title="I Have Arrived at Location"
+              size="lg"
+              fullWidth
+              onPress={handleMarkArrived}
+              icon={<Ionicons name="location-outline" size={20} color="#FFFFFF" />}
+            />
+            <SecondaryButton
+              title="Open Live GPS Map & Directions"
+              size="md"
+              fullWidth
+              onPress={() =>
+                navigation.navigate('NavigationTracking', { job: currentJob, bookingId: resolvedBookingId })
+              }
+              icon={<Ionicons name="navigate-outline" size={18} color={colors.primary} />}
+              style={{ marginTop: spacing.sm }}
+            />
+          </View>
         )}
 
         {currentJob.status === 'arrived' && (

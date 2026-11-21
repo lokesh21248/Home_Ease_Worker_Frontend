@@ -204,6 +204,14 @@ export const HomeDashboardScreen: React.FC = () => {
           activeJobsCount={activeJob ? 1 : 0}
           pendingRequestsCount={jobRequests.length}
           onPressViewDetails={() => navigation.navigate('MainTabs', { screen: 'EarningsTab' })}
+          onPressCompletedJobs={() => navigation.navigate('MainTabs', { screen: 'JobsTab' })}
+          onPressActiveJobs={() => {
+            if (activeJob) {
+              const bId = resolveBookingUuid(activeJob.bookingId, activeJob.id);
+              navigation.navigate('ActiveJob', { job: activeJob, bookingId: bId });
+            }
+          }}
+          onPressIncomingRequests={() => navigation.navigate('JobRequests')}
           style={styles.sectionSpacing}
         />
 

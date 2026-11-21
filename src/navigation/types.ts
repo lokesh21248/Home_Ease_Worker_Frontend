@@ -26,7 +26,7 @@ export type RootStackParamList = {
   // Job Flow
   JobRequests: undefined;
   JobDetails: { job: Job };
-  NavigationTracking: { job: Job };
+  NavigationTracking: { job: Job; bookingId?: string };
   ActiveJob: { job?: Job; bookingId?: string; booking?: any };
   JobCompletion: { job: Job };
 
