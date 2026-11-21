@@ -704,11 +704,16 @@ class WorkerApiService {
         workerId: activeUserId,
         partnerId: activeUserId,
       };
+      const authToken = apiClient.getAuthToken();
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'X-User-Id': activeUserId,
+      };
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+      }
       const response = await axios.post(trackingUrl, payload, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-Id': activeUserId,
-        },
+        headers,
         timeout: 5000,
       });
       return response.data;
@@ -727,14 +732,23 @@ class WorkerApiService {
     customerLng: number
   ): Promise<{ distanceKm: number; etaMinutes: number } | null> {
     const resolvedBookingId = resolveBookingUuid(bookingId);
+    const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
+    const authToken = apiClient.getAuthToken();
     try {
       const url = `${BASE_TRACKING_URL}${API_ENDPOINTS.TRACKING.DISTANCE}`;
+      const headers: Record<string, string> = {
+        'X-User-Id': activeUserId,
+      };
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+      }
       const response = await axios.get(url, {
         params: {
           bookingId: resolvedBookingId,
           customerLat,
           customerLng,
         },
+        headers,
         timeout: 5000,
       });
       const data = response.data;
@@ -760,8 +774,16 @@ class WorkerApiService {
     destLat: number,
     destLng: number
   ): Promise<{ coordinates: [number, number][]; distanceText?: string; durationText?: string } | null> {
+    const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
+    const authToken = apiClient.getAuthToken();
     try {
       const url = `${BASE_TRACKING_URL}${API_ENDPOINTS.TRACKING.ROUTE}`;
+      const headers: Record<string, string> = {
+        'X-User-Id': activeUserId,
+      };
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+      }
       const response = await axios.get(url, {
         params: {
           startLat,
@@ -769,6 +791,7 @@ class WorkerApiService {
           destLat,
           destLng,
         },
+        headers,
         timeout: 6000,
       });
       const data = response.data;
