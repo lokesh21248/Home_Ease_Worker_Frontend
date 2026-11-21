@@ -7,24 +7,25 @@ const getCandidateWebSocketUrls = (): string[] => {
   // 1. Env configured tracking ws url if present
   if (process.env.EXPO_PUBLIC_TRACKING_WS_URL) {
     const envUrl = process.env.EXPO_PUBLIC_TRACKING_WS_URL.trim();
-    if (envUrl) candidates.push(envUrl);
+    if (envUrl && !candidates.includes(envUrl)) {
+      candidates.push(envUrl);
+    }
   }
 
-  // 2. Derive endpoints from BASE_API_URL
+  // 2. Derive standard /ws endpoint from BASE_API_URL
   try {
     const url = new URL(BASE_API_URL);
     const wsProto = url.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = url.host;
-    const workerEndpoint = `${wsProto}//${host}/worker/stream/websocket`;
-    const standardEndpoint = `${wsProto}//${host}/ws`;
+    const standardEndpoint = `${wsProto}//${url.host}/ws`;
 
-    if (!candidates.includes(workerEndpoint)) candidates.push(workerEndpoint);
-    if (!candidates.includes(standardEndpoint)) candidates.push(standardEndpoint);
+    if (!candidates.includes(standardEndpoint)) {
+      candidates.push(standardEndpoint);
+    }
   } catch {
-    const fallbackWorker = 'wss://3-108-55-219.sslip.io/worker/stream/websocket';
     const fallbackWs = 'wss://3-108-55-219.sslip.io/ws';
-    if (!candidates.includes(fallbackWorker)) candidates.push(fallbackWorker);
-    if (!candidates.includes(fallbackWs)) candidates.push(fallbackWs);
+    if (!candidates.includes(fallbackWs)) {
+      candidates.push(fallbackWs);
+    }
   }
 
   return candidates;
