@@ -69,9 +69,11 @@ class ApiClient {
         const status = error?.response?.status;
         const originalConfig = error?.config;
 
-        // If request failed with 401 or 403 and sent an expired/invalid JWT token,
-        // purge the invalid token and retry once with verified fallback UUID credentials!
-        if ((status === 401 || status === 403) && originalConfig && !originalConfig._retry) {
+        // Legacy behaviour kept ONLY for 401 (token missing/expired): purge it and retry once with the UUID fallback.
+        // A 403 means "signed in, but not allowed" (e.g. not this booking's partner). It is NOT an expired token:
+        // previously it also discarded the valid JWT, silently downgrading the whole session to the bare-UUID
+        // identity that the tracking, arrival and PIN endpoints refuse.
+        if (status === 401 && originalConfig && !originalConfig._retry) {
           originalConfig._retry = true;
           if (this.authToken && isJwtToken(this.authToken)) {
             console.warn(`[ApiClient] Token rejected (HTTP ${status}). Retrying with verified partner credentials.`);

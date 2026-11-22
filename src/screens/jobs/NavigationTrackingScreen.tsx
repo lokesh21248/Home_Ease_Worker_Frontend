@@ -1,15 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-  Alert,
-  Modal,
-  TextInput,
-  ScrollView,
-} from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,18 +13,63 @@ import { openTurnByTurnNavigation, safeGoBack } from '../../utils/navigationHelp
 import { alertFeedbackService } from '../../services/alertFeedbackService';
 import { LocationData } from '../../services/locationService';
 import { workerApiService } from '../../api/workerApiService';
-import { workerTrackingLifecycle } from '../../services/TrackingLifecycleManager';
+import { workerTrackingLifecycle, TrackingStatus } from '../../services/TrackingLifecycleManager';
+import {
+  currentStepIndex,
+  decodePolyline,
+  distanceToRouteMeters,
+  maneuverIcon,
+} from '../../services/trackingPolicy';
 import { resolveBookingUuid } from '../../utils/uuid';
 import { PartnerGoogleMapView, PartnerGoogleMapHandle } from '../../components/map/PartnerGoogleMapView';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'NavigationTracking'>;
 
-interface ChatMessage {
-  id: string;
-  sender: 'worker' | 'customer';
-  text: string;
-  time: string;
+/** Provider (Google Routes) step as returned by GET /tracking/{bookingId}/route. */
+interface RouteStep {
+  instruction: string;
+  maneuver: string;
+  distanceMeters: number;
+  startLat: number;
+  startLng: number;
+  endLat: number;
+  endLng: number;
 }
+
+interface RouteState {
+  coordinates: [number, number][];
+  distanceMeters: number;
+  durationSeconds: number;
+  staticDurationSeconds: number | null;
+  steps: RouteStep[];
+  calculatedAtMs: number;
+  refreshAfterSeconds: number;
+}
+
+/** Support line for the SOS button; configured per build. Never a placeholder number. */
+const SUPPORT_PHONE = process.env.EXPO_PUBLIC_SUPPORT_PHONE?.trim() || '';
+const OFF_ROUTE_METERS = 60;
+const PERIODIC_REFRESH_MS = 45_000;
+
+function formatKm(meters: number): string {
+  return meters >= 1000 ? `${(meters / 1000).toFixed(1)} km` : `${Math.round(meters)} m`;
+}
+
+function formatMinutes(seconds: number): string {
+  const m = Math.max(1, Math.round(seconds / 60));
+  return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`;
+}
+
+const STATUS_LABEL: Record<TrackingStatus['state'], { text: string; color: string }> = {
+  IDLE: { text: 'Location sharing off', color: '#6B7280' },
+  STARTING: { text: 'Starting GPS...', color: '#6B7280' },
+  LIVE: { text: 'Live - customer can see you', color: '#16A34A' },
+  RETRYING: { text: 'No connection - retrying', color: '#D97706' },
+  PERMISSION_DENIED: { text: 'Location permission denied', color: '#DC2626' },
+  GPS_DISABLED: { text: 'GPS is switched off', color: '#DC2626' },
+  AUTH_REQUIRED: { text: 'Signed out - sign in again', color: '#DC2626' },
+  ENDED: { text: 'Location sharing ended', color: '#6B7280' },
+};
 
 export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route }) => {
   const { job } = route.params;
@@ -43,163 +78,232 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
 
   const mapRef = useRef<PartnerGoogleMapHandle | null>(null);
   const [currentLocation, setCurrentLocation] = useState<LocationData | null>(null);
-  const [routeCoordinates, setRouteCoordinates] = useState<[number, number][]>([]);
   const [trafficEnabled, setTrafficEnabled] = useState(false);
-  const hasFetchedInitialRoute = useRef(false);
-
-  const [etaMins, setEtaMins] = useState(8);
-  const [estimatedArrivalTime, setEstimatedArrivalTime] = useState<string>('');
-  const [distanceKm, setDistanceKm] = useState(job.location.distanceKm || 1.8);
-
-  useEffect(() => {
-    const d = new Date(Date.now() + etaMins * 60 * 1000);
-    setEstimatedArrivalTime(
-      d.toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    );
-  }, [etaMins]);
+  const [trackingStatus, setTrackingStatus] = useState<TrackingStatus>(workerTrackingLifecycle.getStatus());
+  const [routeState, setRouteState] = useState<RouteState | null>(null);
+  const [routeNotice, setRouteNotice] = useState<string | null>(null);
   const [isArriving, setIsArriving] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [chatInput, setChatInput] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: 'm1',
-      sender: 'customer',
-      text: 'Hi Partner! Please ring the doorbell twice when you reach the flat.',
-      time: '11:15 AM',
-    },
-    {
-      id: 'm2',
-      sender: 'worker',
-      text: 'Hello! Noted. I am on my way and will reach in about 8 minutes.',
-      time: '11:16 AM',
-    },
-  ]);
 
-  // Live GPS broadcast loop (every 3-5s adaptive) to tracking service
-  useEffect(() => {
-    let isMounted = true;
+  const routeRef = useRef<RouteState | null>(null);
+  const routeInFlight = useRef(false);
+  const lastRouteAttemptAt = useRef(0);
+  const offRouteStrikes = useRef(0);
 
-    // Trigger ON_THE_WAY on backend
-    workerApiService.startTravelling(bookingId).catch(() => { });
+  // ───────────────────────── provider road route (distance, ETA, steps) ─────────────────────────
 
-    // Start travel tracking lifecycle
-    workerTrackingLifecycle.startTravelTracking(
-      bookingId,
-      (loc) => {
-        if (!isMounted) return;
-        setCurrentLocation(loc);
-
-        // Fetch driving route polyline once on initial fix
-        if (!hasFetchedInitialRoute.current && job.location.latitude && job.location.longitude) {
-          hasFetchedInitialRoute.current = true;
-          workerApiService
-            .getDrivingRoute(
-              loc.latitude,
-              loc.longitude,
-              job.location.latitude,
-              job.location.longitude
-            )
-            .then((routeData) => {
-              if (routeData?.coordinates && isMounted) {
-                setRouteCoordinates(routeData.coordinates);
-              }
-            })
-            .catch(() => { });
+  const loadRoute = useCallback(
+    async (reason: 'INITIAL' | 'PERIODIC' | 'OFF_ROUTE') => {
+      if (routeInFlight.current) return;
+      routeInFlight.current = true;
+      lastRouteAttemptAt.current = Date.now();
+      try {
+        const res = await workerApiService.getBookingRoute(bookingId, reason);
+        const d = res.data;
+        if (res.status === 200 && d?.polyline) {
+          const next: RouteState = {
+            coordinates: decodePolyline(d.polyline),
+            distanceMeters: Number(d.distanceMeters) || 0,
+            durationSeconds: Number(d.durationSeconds) || 0,
+            staticDurationSeconds: typeof d.staticDurationSeconds === 'number' ? d.staticDurationSeconds : null,
+            steps: Array.isArray(d.steps) ? d.steps : [],
+            calculatedAtMs: Number(d.calculatedAtEpochMs) || Date.now(),
+            refreshAfterSeconds: Number(d.refreshAfterSeconds) || 20,
+          };
+          routeRef.current = next;
+          offRouteStrikes.current = 0;
+          setRouteState(next);
+          setRouteNotice(null);
+        } else if (res.status === 409 && d?.code?.startsWith('WORKER_LOCATION')) {
+          setRouteNotice('Waiting for your first GPS fix to plan the route...');
+        } else if (res.status === 401) {
+          setRouteNotice('Sign in again to load the route.');
+        } else if (res.status !== null) {
+          setRouteNotice(d?.message || 'Route is temporarily unavailable.');
+        } else {
+          setRouteNotice('No connection. The route will refresh when you are back online.');
         }
-      },
-      (distanceData) => {
-        if (!isMounted) return;
-        setDistanceKm(distanceData.distanceKm);
-        setEtaMins(distanceData.etaMinutes);
-      },
-      { latitude: job.location.latitude, longitude: job.location.longitude }
-    );
+      } catch (e: any) {
+        setRouteNotice(e?.message || 'Route is temporarily unavailable.');
+      } finally {
+        routeInFlight.current = false;
+      }
+    },
+    [bookingId]
+  );
+
+  // ───────────────────────── start trip + live GPS ─────────────────────────
+
+  useEffect(() => {
+    let mounted = true;
+    const unsubscribe = workerTrackingLifecycle.subscribeStatus((s) => {
+      if (mounted) setTrackingStatus(s);
+    });
+
+    (async () => {
+      try {
+        await workerApiService.startTravelling(bookingId);
+      } catch (e: any) {
+        // already ON_THE_WAY is fine; anything else is shown, not hidden
+        if (mounted && e?.status && e.status !== 409) {
+          Alert.alert('Could not start the trip', e?.message || 'Please try again.');
+        }
+      }
+      await workerTrackingLifecycle.startTravelTracking(
+        bookingId,
+        (loc) => {
+          if (!mounted) return;
+          setCurrentLocation({
+            latitude: loc.latitude,
+            longitude: loc.longitude,
+            heading: loc.heading,
+            speed: loc.speed,
+            accuracy: loc.accuracy,
+            locality: '',
+            city: '',
+          });
+          const r = routeRef.current;
+          const now = Date.now();
+          if (!r) {
+            if (now - lastRouteAttemptAt.current > 5_000) void loadRoute('INITIAL');
+            return;
+          }
+          // Off-route: two consecutive fixes > 60 m from the provider polyline -> ask for a new route
+          const off = distanceToRouteMeters(loc, r.coordinates) > OFF_ROUTE_METERS;
+          offRouteStrikes.current = off ? offRouteStrikes.current + 1 : 0;
+          if (offRouteStrikes.current >= 2 && now - lastRouteAttemptAt.current > 8_000) {
+            void loadRoute('OFF_ROUTE');
+          } else if (now - lastRouteAttemptAt.current > Math.max(PERIODIC_REFRESH_MS, r.refreshAfterSeconds * 1000)) {
+            void loadRoute('PERIODIC');
+          }
+        },
+        undefined,
+        { latitude: job.location.latitude, longitude: job.location.longitude }
+      );
+    })();
 
     return () => {
-      isMounted = false;
-      workerTrackingLifecycle.stopTracking(bookingId);
+      mounted = false;
+      unsubscribe();
+      // Leaving the screen does NOT stop sharing: the partner is still travelling (background task keeps going).
     };
-  }, [bookingId, job.location.latitude, job.location.longitude]);
+  }, [bookingId, job.location.latitude, job.location.longitude, loadRoute]);
 
-  const handleSendMessage = () => {
-    if (!chatInput.trim()) return;
-    const newMsg: ChatMessage = {
-      id: `m-${Date.now()}`,
-      sender: 'worker',
-      text: chatInput.trim(),
-      time: 'Just now',
-    };
-    setMessages((prev) => [...prev, newMsg]);
-    setChatInput('');
+  // ───────────────────────── actions ─────────────────────────
 
-    setTimeout(() => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `m-reply-${Date.now()}`,
-          sender: 'customer',
-          text: 'Great, thanks! Looking forward.',
-          time: 'Just now',
-        },
-      ]);
-    }, 1200);
+  const callCustomer = () => {
+    if (!job.customer.phone) {
+      Alert.alert('No phone number', 'This booking has no customer phone number.');
+      return;
+    }
+    void Linking.openURL(`tel:${job.customer.phone}`);
+  };
+
+  const messageCustomer = () => {
+    if (!job.customer.phone) {
+      Alert.alert('No phone number', 'This booking has no customer phone number.');
+      return;
+    }
+    void Linking.openURL(`sms:${job.customer.phone}`);
+  };
+
+  const handleSos = () => {
+    const buttons: { text: string; style?: 'cancel' | 'destructive'; onPress?: () => void }[] = [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Call 112 (Emergency)', style: 'destructive', onPress: () => void Linking.openURL('tel:112') },
+    ];
+    if (SUPPORT_PHONE) {
+      buttons.splice(1, 0, { text: 'Call HomeEase Support', onPress: () => void Linking.openURL(`tel:${SUPPORT_PHONE}`) });
+    }
+    Alert.alert(
+      'Safety',
+      SUPPORT_PHONE
+        ? 'Call HomeEase support or emergency services.'
+        : 'A HomeEase support line is not configured in this build. For emergencies call 112.',
+      buttons
+    );
   };
 
   const handleArrived = async () => {
     if (isArriving) return;
     setIsArriving(true);
-
     try {
-      // 1. Immediately stop booking travel GPS collection and uploads
-      workerTrackingLifecycle.stopTracking(bookingId);
+      // The server checks your GPS against the customer's address before issuing the customer's PIN.
+      await updateJobStatus('arrived');
       alertFeedbackService.playSuccessFeedback();
-
-      // 2. Update local state — AppContext.updateJobStatus('arrived') internally calls
-      //    workerApiService.arriveAtCustomer() with an idempotency guard, so we do NOT
-      //    call it separately here to avoid a duplicate backend request.
-      updateJobStatus('arrived');
       navigation.navigate('ActiveJob', { job: { ...job, bookingId, status: 'arrived' }, bookingId });
     } catch (err: any) {
-      console.warn('[NavigationTrackingScreen] arrived notice:', err?.message);
-      updateJobStatus('arrived');
-      navigation.navigate('ActiveJob', { job: { ...job, bookingId, status: 'arrived' }, bookingId });
+      Alert.alert('Not marked as arrived', err?.message || 'Please try again when you reach the customer.');
     } finally {
       setIsArriving(false);
     }
   };
 
+  // ───────────────────────── derived display ─────────────────────────
+
+  const steps = routeState?.steps ?? [];
+  const stepIdx = currentLocation && steps.length ? currentStepIndex(steps, currentLocation) : -1;
+  const step = stepIdx >= 0 ? steps[stepIdx] : null;
+  const metersToStepEnd =
+    step && currentLocation
+      ? Math.round(
+          distanceToRouteMeters(currentLocation, [[step.endLng, step.endLat]])
+        )
+      : null;
+  const status = STATUS_LABEL[trackingStatus.state];
+  const arrivalClock = routeState
+    ? new Date(routeState.calculatedAtMs + routeState.durationSeconds * 1000).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : null;
+  const initials = (job.customer.name || '?')
+    .split(' ')
+    .map((p) => p.charAt(0))
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <CustomHeader
-        title="Live Turn-by-Turn GPS"
-        subtitle={`To ${job.customer.name}'s Location`}
+        title="Navigation"
+        subtitle={`To ${job.customer.name}'s location`}
         showBack
         onBack={() => safeGoBack(navigation, 'ActiveJob', { jobId: job.id, job })}
       />
 
-      {/* Turn-by-Turn Instruction Banner */}
+      {/* Turn-by-turn: the provider's own instruction for the current step, or an honest placeholder */}
       <View style={styles.turnBanner}>
         <View style={styles.turnIconCircle}>
-          <Ionicons name="arrow-up" size={24} color="#FFFFFF" />
+          <Ionicons name={(step ? maneuverIcon(step.maneuver) : 'navigate') as any} size={24} color="#FFFFFF" />
         </View>
         <View style={styles.turnInfoCol}>
-          <Text style={styles.turnDistance}>In 250 meters</Text>
-          <Text style={styles.turnInstruction}>Turn left onto Main Road</Text>
+          {step ? (
+            <>
+              <Text style={styles.turnDistance}>
+                {metersToStepEnd !== null ? `In ${formatKm(metersToStepEnd)}` : ''}
+              </Text>
+              <Text style={styles.turnInstruction} numberOfLines={2}>
+                {step.instruction || 'Continue on the route'}
+              </Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.turnDistance}>Turn-by-turn</Text>
+              <Text style={styles.turnInstruction} numberOfLines={2}>
+                {routeNotice || 'Loading route...'} Tap Maps for voice navigation.
+              </Text>
+            </>
+          )}
         </View>
         <View style={styles.speedPill}>
           <Text style={styles.speedText}>
-            {currentLocation?.speed && currentLocation.speed > 0
-              ? Math.round(currentLocation.speed * 3.6)
-              : 0}
+            {currentLocation?.speed && currentLocation.speed > 0 ? Math.round(currentLocation.speed * 3.6) : 0}
           </Text>
           <Text style={styles.speedUnit}>km/h</Text>
         </View>
       </View>
 
-      {/* Google Maps Realtime Tracking Area */}
       <View style={styles.mapArea}>
         <PartnerGoogleMapView
           ref={mapRef}
@@ -210,16 +314,16 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
           customerLng={job.location.longitude}
           customerAddress={job.location.address}
           customerName={job.customer.name}
-          routeCoordinates={routeCoordinates}
+          routeCoordinates={routeState?.coordinates ?? []}
           trafficEnabled={trafficEnabled}
         />
 
-        {/* Map Overlay Controls */}
         <View style={styles.mapControls}>
           <TouchableOpacity
             style={styles.mapBtn}
             activeOpacity={0.8}
             onPress={() => mapRef.current?.recenterToWorker()}
+            accessibilityLabel="Recenter on my position"
           >
             <Ionicons name="locate-outline" size={20} color={colors.primary} />
           </TouchableOpacity>
@@ -227,49 +331,54 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
             style={[styles.mapBtn, trafficEnabled && styles.mapBtnActive]}
             activeOpacity={0.8}
             onPress={() => setTrafficEnabled((prev) => !prev)}
+            accessibilityLabel="Toggle traffic"
           >
-            <Ionicons
-              name="layers-outline"
-              size={20}
-              color={trafficEnabled ? colors.primary : colors.textPrimary}
-            />
+            <Ionicons name="layers-outline" size={20} color={trafficEnabled ? colors.primary : colors.textPrimary} />
           </TouchableOpacity>
         </View>
 
-        {/* ETA & Distance Floating Bar */}
+        {/* Road distance + traffic-aware ETA from the routing provider only; nothing is estimated on the phone */}
         <View style={styles.etaFloatingBar}>
           <View style={styles.etaCol}>
-            <Text style={styles.etaValue}>{etaMins} mins</Text>
-            <Text style={styles.etaLabel}>{distanceKm} km • Fastest Route</Text>
+            <Text style={styles.etaValue}>{routeState ? formatMinutes(routeState.durationSeconds) : '--'}</Text>
+            <Text style={styles.etaLabel}>
+              {routeState
+                ? `${formatKm(routeState.distanceMeters)} by road${
+                    routeState.staticDurationSeconds !== null &&
+                    routeState.durationSeconds > routeState.staticDurationSeconds + 60
+                      ? ' - traffic'
+                      : ''
+                  }`
+                : routeNotice || 'Calculating route...'}
+            </Text>
           </View>
           <View style={styles.etaDivider} />
           <View style={styles.arrivalCol}>
             <Text style={styles.arrivalLabel}>Est. Arrival</Text>
-            <Text style={styles.arrivalValue}>{estimatedArrivalTime || '--:--'}</Text>
+            <Text style={styles.arrivalValue}>{arrivalClock || '--:--'}</Text>
           </View>
         </View>
       </View>
 
-      {/* Bottom Sheet Card */}
       <View style={styles.bottomCard}>
         <View style={styles.dragPill} />
 
         <View style={styles.statusPillRow}>
-          <View style={[styles.statusPill, { backgroundColor: '#EFF6FF' }]}>
-            <View style={styles.statusPillDot} />
-            <Text style={styles.statusPillText}>En Route · GPS Active</Text>
+          <View style={[styles.statusPill, { backgroundColor: '#F3F4F6' }]}>
+            <View style={[styles.statusPillDot, { backgroundColor: status.color }]} />
+            <Text style={[styles.statusPillText, { color: status.color }]}>{status.text}</Text>
           </View>
         </View>
+        {trackingStatus.message ? <Text style={styles.noticeText}>{trackingStatus.message}</Text> : null}
 
         <View style={styles.customerRow}>
-          <Image
-            source={{
-              uri:
-                job.customer.avatar ||
-                'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
-            }}
-            style={styles.customerAvatar}
-          />
+          {job.customer.avatar ? (
+            <Image source={{ uri: job.customer.avatar }} style={styles.customerAvatar} />
+          ) : (
+            <View style={[styles.customerAvatar, styles.avatarInitials]}>
+              <Text style={styles.avatarInitialsText}>{initials}</Text>
+            </View>
+          )}
           <View style={styles.customerMeta}>
             <Text style={styles.customerName}>{job.customer.name}</Text>
             <Text style={styles.jobType}>{job.serviceName}</Text>
@@ -280,25 +389,17 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
         </View>
 
         <View style={styles.actionButtonsRow}>
-          <TouchableOpacity
-            style={styles.circleActionButton}
-            activeOpacity={0.8}
-            onPress={() => Alert.alert('Calling Customer', `Calling ${job.customer.phone}...`)}
-          >
+          <TouchableOpacity style={styles.circleActionButton} activeOpacity={0.8} onPress={callCustomer}>
             <Ionicons name="call-outline" size={20} color={colors.primary} />
             <Text style={styles.circleActionText}>Call</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.circleActionButton}
-            activeOpacity={0.8}
-            onPress={() => setIsChatOpen(true)}
-          >
+          <TouchableOpacity style={styles.circleActionButton} activeOpacity={0.8} onPress={messageCustomer}>
             <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.primary} />
-            <Text style={styles.circleActionText}>Chat</Text>
+            <Text style={styles.circleActionText}>SMS</Text>
           </TouchableOpacity>
 
-          {/* 1-Tap Launch Native Maps Navigation */}
+          {/* Full voice turn-by-turn navigation is delegated to Google Maps (Navigation intent) */}
           <TouchableOpacity
             style={styles.circleActionButton}
             activeOpacity={0.8}
@@ -315,20 +416,14 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
             <Text style={styles.circleActionText}>Maps</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.circleActionButton}
-            activeOpacity={0.8}
-            onPress={() =>
-              Alert.alert('Safety Desk', 'Emergency alert notified to support.')
-            }
-          >
+          <TouchableOpacity style={styles.circleActionButton} activeOpacity={0.8} onPress={handleSos}>
             <Ionicons name="shield-outline" size={20} color={colors.primary} />
             <Text style={styles.circleActionText}>SOS</Text>
           </TouchableOpacity>
         </View>
 
         <PrimaryButton
-          title={isArriving ? "Confirming Arrival..." : "✓  I Have Arrived — Notify Customer"}
+          title={isArriving ? 'Confirming arrival...' : 'I have arrived - notify customer'}
           size="lg"
           fullWidth
           loading={isArriving}
@@ -336,76 +431,27 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
           icon={<Ionicons name="location-outline" size={20} color="#FFFFFF" />}
         />
       </View>
-
-      {/* Customer In-App Chat Modal */}
-      <Modal
-        visible={isChatOpen}
-        animationType="slide"
-        onRequestClose={() => setIsChatOpen(false)}
-      >
-        <SafeAreaView style={styles.chatModalContainer} edges={['top']}>
-          <CustomHeader
-            title={`Chat with ${job.customer.name}`}
-            subtitle="Encrypted in-app messaging"
-            showBack
-            onBack={() => setIsChatOpen(false)}
-          />
-
-          <ScrollView style={styles.chatScroll} contentContainerStyle={{ padding: spacing.md }}>
-            {messages.map((msg) => {
-              const isWorker = msg.sender === 'worker';
-              return (
-                <View
-                  key={msg.id}
-                  style={[
-                    styles.chatBubble,
-                    isWorker ? styles.chatBubbleWorker : styles.chatBubbleCustomer,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.chatText,
-                      isWorker ? styles.chatTextWorker : styles.chatTextCustomer,
-                    ]}
-                  >
-                    {msg.text}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.chatTimeText,
-                      isWorker ? styles.chatTimeWorker : styles.chatTimeCustomer,
-                    ]}
-                  >
-                    {msg.time}
-                  </Text>
-                </View>
-              );
-            })}
-          </ScrollView>
-
-          <View style={styles.chatInputRow}>
-            <TextInput
-              style={styles.chatTextInput}
-              placeholder="Type message..."
-              placeholderTextColor={colors.textSecondary}
-              value={chatInput}
-              onChangeText={setChatInput}
-            />
-            <TouchableOpacity
-              style={styles.sendIconBtn}
-              onPress={handleSendMessage}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="send" size={18} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
-      </Modal>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  noticeText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    textAlign: "center",
+    marginBottom: spacing.sm,
+  },
+  avatarInitials: {
+    backgroundColor: "#DBEAFE",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarInitialsText: {
+    color: "#1D4ED8",
+    fontWeight: "700",
+    fontSize: 16,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.background,

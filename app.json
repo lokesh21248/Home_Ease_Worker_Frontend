@@ -45,6 +45,15 @@
       "expo-router",
       "expo-font",
       [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "HomeEase Partner uses your location to navigate to the customer and show them your live arrival progress.",
+          "locationAlwaysAndWhenInUsePermission": "HomeEase Partner shares your location with the customer only while you are travelling to their booking, including when the app is in the background.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      [
         "expo-build-properties",
         {
           "android": {

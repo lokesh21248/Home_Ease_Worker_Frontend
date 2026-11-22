@@ -1,6 +1,6 @@
 import axios from 'axios';
 import apiClient from './client';
-import { API_ENDPOINTS, BASE_TRACKING_URL } from './endpoints';
+import { API_ENDPOINTS, BASE_API_URL, BASE_TRACKING_URL } from './endpoints';
 import { resolveBookingUuid, isValidUuid } from '../utils/uuid';
 import { DaySchedule, TimeOffItem, WorkerScheduleSlot, WorkerTodaySchedule } from '../types';
 
@@ -86,6 +86,34 @@ export interface EarningsOverviewResponse {
  * Worker Partner API Service
  * Implements end-to-end HTTP integration for all endpoints in the HomeEase Worker Partner guide.
  */
+/** Result of a live-tracking call: HTTP status (null = no response / network error) and body. */
+export interface TrackingCallResult {
+  status: number | null;
+  data: any;
+}
+
+/**
+ * The partner's signed JWT, or null. Tracking calls never fall back to a bare user id: the server rejects that
+ * identity for live location, arrival and PIN, and a fabricated default id must never act for a real partner.
+ */
+function signedToken(): string | null {
+  const t = apiClient.getAuthToken();
+  return typeof t === 'string' && t.trim().split('.').length === 3 ? t.trim() : null;
+}
+
+/** A refused or failed tracking / arrival call, carrying the server's stable code and user-safe message. */
+export class TrackingApiError extends Error {
+  constructor(
+    public readonly code: string,
+    message: string,
+    public readonly status: number | null,
+    public readonly retryAfterSeconds?: number
+  ) {
+    super(message);
+    this.name = 'TrackingApiError';
+  }
+}
+
 class WorkerApiService {
   private profilePromise: Promise<any> | null = null;
 
@@ -625,67 +653,145 @@ class WorkerApiService {
    * 4.25 Start Travelling to Customer: POST /workers/bookings/{bookingId}/on-the-way
    */
   public async startTravelling(bookingId: string): Promise<any> {
-    const resolvedBookingId = resolveBookingUuid(bookingId);
-    const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
-    try {
-      const url = API_ENDPOINTS.BOOKINGS.ON_THE_WAY(resolvedBookingId);
-      const response = await apiClient.post<any>(
-        url,
-        { userId: activeUserId },
-        {
-          headers: { 'X-User-Id': activeUserId },
-          params: { userId: activeUserId },
-        }
-      );
-      return (response.data as any)?.data ?? response.data;
-    } catch (error: any) {
-      console.warn('[WorkerApi] startTravelling notice:', error?.message);
-      return { success: true, bookingId: resolvedBookingId };
-    }
+    // Real outcome only: the previous version reported { success: true } even when the server refused.
+    return this.bookingTransition(bookingId, API_ENDPOINTS.BOOKINGS.ON_THE_WAY(resolveBookingUuid(bookingId)));
   }
 
   /**
    * 4.28 Mark Arrival at Customer Location: POST /workers/bookings/{bookingId}/arrive
+   *
+   * The server now checks that the partner's latest GPS fix is near the customer's saved address. On refusal this
+   * throws a TrackingApiError whose code is NOT_AT_DESTINATION or LOCATION_REQUIRED and whose message can be shown
+   * to the partner as is. (It used to return { success: true } on any error, so the app showed "arrived" while the
+   * booking was not.)
    */
   public async arriveAtCustomer(bookingId: string): Promise<any> {
-    const resolvedBookingId = resolveBookingUuid(bookingId);
-    const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
+    return this.bookingTransition(bookingId, API_ENDPOINTS.BOOKINGS.ARRIVE(resolveBookingUuid(bookingId)));
+  }
+
+  private async bookingTransition(bookingId: string, path: string): Promise<any> {
+    const token = signedToken();
+    if (!token) {
+      throw new TrackingApiError('JWT_REQUIRED', 'Your session has expired. Please sign in again.', 401);
+    }
     try {
-      const url = API_ENDPOINTS.BOOKINGS.ARRIVE(resolvedBookingId);
-      const response = await apiClient.post<any>(
-        url,
-        { userId: activeUserId },
-        {
-          headers: { 'X-User-Id': activeUserId },
-          params: { userId: activeUserId },
-        }
-      );
+      const response = await axios.post(`${BASE_API_URL}${path}`, {}, {
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        timeout: 10000,
+      });
       return (response.data as any)?.data ?? response.data;
     } catch (error: any) {
-      const errorMsg = error?.response?.data?.message || error?.message;
-      if (errorMsg && (errorMsg.includes('ARRIVED') || errorMsg.includes('already'))) {
-        return { success: true, bookingId: resolvedBookingId, status: 'ARRIVED' };
-      }
-      console.warn('[WorkerApi] arriveAtCustomer notice:', errorMsg);
-      return { success: true, bookingId: resolvedBookingId };
+      const status: number | null = error?.response?.status ?? null;
+      const body = error?.response?.data ?? {};
+      const message: string =
+        body?.message || body?.error || (status === null ? 'No connection. Check your network and try again.' : 'Request failed.');
+      throw new TrackingApiError(body?.code || (status === null ? 'NETWORK' : String(status)), message, status, body?.retryAfterSeconds);
     }
   }
 
   /**
-   * 5.1 Publish Live GPS Coordinate to Port 8082 Tracking Microservice:
-   * POST http://3.108.55.219/api/v1/tracking/partner/location
+   * 5.1 Publish one live GPS fix: POST {BASE_TRACKING_URL}/tracking/{bookingId}/location
+   *
+   * Identity is the signed JWT only. The previous version sent a hard-coded fallback worker UUID and an X-User-Id
+   * header (which the server no longer trusts), swallowed every error, and on any failure posted the same fix a
+   * second time to another endpoint. Now it returns the HTTP status so the upload loop can retry, stop or re-auth.
    */
   public async publishLiveLocation(
-    _bookingId: string,
-    _lat: number,
-    _lng: number,
-    _bearing: number = 0,
-    _speed: number = 0,
-    _accuracy: number = 5.0,
-    _timestamp: number = Date.now()
-  ): Promise<any> {
-    // Live tracking disabled: worker does not stream continuous GPS
-    return null;
+    bookingId: string,
+    lat: number,
+    lng: number,
+    bearing: number | null = null,
+    speed: number | null = null,
+    accuracy: number | null = null,
+    timestamp: number = Date.now()
+  ): Promise<TrackingCallResult> {
+    const resolvedBookingId = resolveBookingUuid(bookingId);
+    const token = signedToken();
+    if (!token) return { status: 401, data: null };
+    const payload = {
+      bookingId: resolvedBookingId,
+      lat,
+      lng,
+      bearing: typeof bearing === 'number' && bearing >= 0 ? bearing : null,
+      speed: typeof speed === 'number' && speed >= 0 ? speed : null,
+      accuracy: typeof accuracy === 'number' && accuracy >= 0 ? accuracy : null,
+      timestamp,
+    };
+    try {
+      const response = await axios.post(`${BASE_TRACKING_URL}/tracking/${resolvedBookingId}/location`, payload, {
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        timeout: 6000,
+      });
+      return { status: response.status, data: response.data };
+    } catch (error: any) {
+      return { status: error?.response?.status ?? null, data: error?.response?.data ?? null };
+    }
+  }
+
+  /**
+   * 5.1b End live tracking (assigned partner only): POST {BASE_TRACKING_URL}/tracking/{bookingId}/stop?reason=...
+   */
+  public async stopTrackingSession(bookingId: string, reason: string = 'STOPPED'): Promise<TrackingCallResult> {
+    const resolvedBookingId = resolveBookingUuid(bookingId);
+    const token = signedToken();
+    if (!token) return { status: 401, data: null };
+    try {
+      const response = await axios.post(
+        `${BASE_TRACKING_URL}/tracking/${resolvedBookingId}/stop?reason=${encodeURIComponent(reason)}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` }, timeout: 6000 }
+      );
+      return { status: response.status, data: response.data };
+    } catch (error: any) {
+      return { status: error?.response?.status ?? null, data: error?.response?.data ?? null };
+    }
+  }
+
+  /**
+   * 5.1c Tell the server WHY location is missing (PERMISSION_DENIED / GPS_DISABLED) or that it is OK again, so the
+   * customer sees the real reason instead of a frozen marker: POST {BASE_API_URL}/tracking/{bookingId}/device-status
+   */
+  public async reportDeviceStatus(
+    bookingId: string,
+    state: 'OK' | 'PERMISSION_DENIED' | 'GPS_DISABLED'
+  ): Promise<TrackingCallResult> {
+    const resolvedBookingId = resolveBookingUuid(bookingId);
+    const token = signedToken();
+    if (!token) return { status: 401, data: null };
+    try {
+      const response = await axios.post(
+        `${BASE_API_URL}/tracking/${resolvedBookingId}/device-status`,
+        { state },
+        { headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, timeout: 6000 }
+      );
+      return { status: response.status, data: response.data };
+    } catch (error: any) {
+      return { status: error?.response?.status ?? null, data: error?.response?.data ?? null };
+    }
+  }
+
+  /**
+   * 5.1d Provider road route for the booking (core): GET {BASE_API_URL}/tracking/{bookingId}/route?reason=...
+   * Origin = this partner's latest server-side fix, destination = the booking's saved address. Returns real road
+   * distance, traffic-aware duration, the encoded polyline and the provider's turn-by-turn steps.
+   */
+  public async getBookingRoute(
+    bookingId: string,
+    reason: 'INITIAL' | 'PERIODIC' | 'OFF_ROUTE' = 'PERIODIC'
+  ): Promise<TrackingCallResult> {
+    const resolvedBookingId = resolveBookingUuid(bookingId);
+    const token = signedToken();
+    if (!token) return { status: 401, data: null };
+    try {
+      const response = await axios.get(`${BASE_API_URL}/tracking/${resolvedBookingId}/route`, {
+        params: { reason },
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 12000,
+      });
+      return { status: response.status, data: response.data };
+    } catch (error: any) {
+      return { status: error?.response?.status ?? null, data: error?.response?.data ?? null };
+    }
   }
 
   /**

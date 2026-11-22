@@ -78,15 +78,12 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   const handleMarkArrived = async () => {
-    // Stop GPS tracking immediately (before backend call)
+    // AppContext confirms the arrival with the server first (it checks GPS proximity) and only then stops tracking.
     try {
-      workerTrackingLifecycle.stopTracking(resolvedBookingId);
+      await updateJobStatus('arrived');
     } catch (e: any) {
-      console.warn('[ActiveJobScreen] stopTracking:', e?.message);
+      Alert.alert('Not marked as arrived', e?.message || 'Please try again when you reach the customer.');
     }
-    // updateJobStatus('arrived') already calls arriveAtCustomer internally via AppContext
-    // so we do NOT call arriveAtCustomer here to avoid a duplicate backend request
-    updateJobStatus('arrived');
   };
 
   // Live Stopwatch timer

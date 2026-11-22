@@ -78,7 +78,8 @@ interface AppContextType {
   fetchJobRequests: () => Promise<void>;
   acceptJob: (jobId: string) => Promise<void> | void;
   rejectJob: (jobId: string, reason?: string) => Promise<void> | void;
-  updateJobStatus: (status: JobStatus) => void;
+  /** Rejects (with the server's message) when the backend refuses, e.g. arrival from too far away. */
+  updateJobStatus: (status: JobStatus) => Promise<void>;
   verifyJobPin: (jobId: string, pinCode: string) => Promise<{ success: boolean; message: string; errorCode?: string; data?: any }>;
   addSubServiceToJob: (jobId: string, subServiceId: string, quantity: number) => Promise<{ success: boolean; message: string }>;
   workerLocation: { lat: number; lng: number };
@@ -1072,8 +1073,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   };
 
-  const updateJobStatus = (newStatus: JobStatus) => {
+  const updateJobStatus = async (newStatus: JobStatus): Promise<void> => {
     if (!activeJob) return;
+
+    // Arrival is a server decision (it checks the partner's GPS against the saved address and issues the customer's
+    // PIN). Confirm it BEFORE changing local state, and keep live tracking running until it is confirmed: the
+    // server needs a fresh fix to accept the arrival. Errors propagate so the screen can show the reason.
+    if (newStatus === 'arrived' && activeJob.status !== 'arrived') {
+      const arrivalBookingId = resolveBookingUuid(activeJob.bookingId, activeJob.id);
+      await workerApiService.arriveAtCustomer(arrivalBookingId);
+      await workerTrackingLifecycle.stopTracking(arrivalBookingId, 'ARRIVED', false);
+    }
 
     const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const updatedTimeline = { ...activeJob.timeline };
@@ -1091,10 +1101,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const bId = resolveBookingUuid(activeJob.bookingId, activeJob.id);
     if (newStatus === 'travelling') {
       workerApiService.startTravelling(bId).catch((e) => console.warn('[AppContext] startTravelling:', e?.message));
-    } else if (newStatus === 'arrived') {
-      if (activeJob.status !== 'arrived') {
-        workerApiService.arriveAtCustomer(bId).catch((e) => console.warn('[AppContext] arriveAtCustomer:', e?.message));
-      }
+      // Automatically activate GPS broadcasting with Android foreground service
+      const custLat = (activeJob as any)?.customerLat ?? (activeJob as any)?.latitude;
+      const custLng = (activeJob as any)?.customerLng ?? (activeJob as any)?.longitude;
+      const customerLoc = custLat && custLng ? { lat: Number(custLat), lng: Number(custLng) } : undefined;
+      workerTrackingLifecycle.startTravelTracking(bId, undefined, undefined, customerLoc).catch((e) =>
+        console.warn('[AppContext] startTravelTracking:', e?.message)
+      );
     }
   };
 
