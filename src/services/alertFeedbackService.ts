@@ -15,15 +15,19 @@ class AlertFeedbackService {
         Vibration.vibrate([0, 500, 200, 500]);
       }
 
-      // Trigger heavy haptic alert sequence
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      setTimeout(async () => {
-        try {
-          await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-        } catch {}
-      }, 300);
-    } catch (error) {
-      console.warn('[AlertFeedbackService] Error triggering alert feedback:', error);
+      // Trigger haptic alert if supported natively by device
+      try {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        setTimeout(async () => {
+          try {
+            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+          } catch {}
+        }, 300);
+      } catch {
+        // Silently handled: native haptics unsupported or running in Expo Go without native build
+      }
+    } catch {
+      // Handled silently
     }
   }
 
@@ -33,9 +37,13 @@ class AlertFeedbackService {
   public async playSuccessFeedback(): Promise<void> {
     try {
       Vibration.vibrate(180);
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (error) {
-      console.warn('[AlertFeedbackService] Error triggering success feedback:', error);
+      try {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {
+        // Silently handled
+      }
+    } catch {
+      // Handled silently
     }
   }
 

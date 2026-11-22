@@ -389,16 +389,13 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
         </PremiumCard>
 
-        {/* Customer Destination & GPS Navigation Card */}
+        {/* Customer Destination Card */}
         <LocationCard
           address={currentJob.location.address}
           pincode={currentJob.location.pincode}
           distanceKm={currentJob.location.distanceKm}
           etaMinutes={currentJob.estimatedArrivalMinutes}
           customerPhone={currentJob.customer.phone}
-          onInAppNavigate={() =>
-            navigation.navigate('NavigationTracking', { job: currentJob, bookingId: resolvedBookingId })
-          }
           onNavigate={() =>
             openTurnByTurnNavigation({
               latitude: currentJob.location.latitude,
@@ -407,7 +404,7 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
               address: currentJob.location.address,
             })
           }
-          onCall={() => Alert.alert('Calling Customer', `Dialing ${currentJob.customer.phone}`)}
+          onCall={() => Linking.openURL(`tel:${currentJob.customer.phone}`).catch(() => Alert.alert('Call', `Customer phone: ${currentJob.customer.phone}`))}
           style={{ marginBottom: spacing.md }}
         />
 
@@ -506,25 +503,13 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
         )}
 
         {currentJob.status === 'travelling' && (
-          <View style={{ width: '100%' }}>
-            <PrimaryButton
-              title="I Have Arrived at Location"
-              size="lg"
-              fullWidth
-              onPress={handleMarkArrived}
-              icon={<Ionicons name="location-outline" size={20} color="#FFFFFF" />}
-            />
-            <SecondaryButton
-              title="Open Live GPS Map & Directions"
-              size="md"
-              fullWidth
-              onPress={() =>
-                navigation.navigate('NavigationTracking', { job: currentJob, bookingId: resolvedBookingId })
-              }
-              icon={<Ionicons name="navigate-outline" size={18} color={colors.primary} />}
-              style={{ marginTop: spacing.sm }}
-            />
-          </View>
+          <PrimaryButton
+            title="I Have Arrived at Location"
+            size="lg"
+            fullWidth
+            onPress={handleMarkArrived}
+            icon={<Ionicons name="location-outline" size={20} color="#FFFFFF" />}
+          />
         )}
 
         {currentJob.status === 'arrived' && (

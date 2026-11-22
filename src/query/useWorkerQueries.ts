@@ -3,7 +3,6 @@ import { workerApiService } from '../api/workerApiService';
 import { useWorkerStore } from '../store/useWorkerStore';
 import { resolveBookingUuid } from '../utils/uuid';
 import { JobStatus } from '../types';
-import { workerTrackingLifecycle } from '../services/TrackingLifecycleManager';
 
 export const QUERY_KEYS = {
   workerProfile: ['worker', 'profile'] as const,
@@ -152,12 +151,8 @@ export const useUpdateJobStatusMutation = () => {
       if (status === 'travelling') {
         await workerApiService.startTravelling(bId);
       } else if (status === 'arrived') {
-        workerTrackingLifecycle.stopTracking(bId);
         await workerApiService.arriveAtCustomer(bId);
-      } else if (status === 'started') {
-        workerTrackingLifecycle.stopTracking(bId);
       } else if (status === 'completed') {
-        workerTrackingLifecycle.stopTracking(bId);
         await workerApiService.completeBooking(bId).catch(() => {});
       }
 

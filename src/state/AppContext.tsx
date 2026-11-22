@@ -647,11 +647,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (updatedOnline) {
         setGpsStatus('online');
-        locationService.startLiveTracking((loc) => {
-          setLocationData(loc);
-          setWorkerLocation({ lat: loc.latitude, lng: loc.longitude });
-        }, 10000);
-
         const targetId = apiClient.getUserId() || worker.userId || worker.id;
         webSocketService.connect(targetId, worker.id);
         fetchJobRequests().catch(() => {});
@@ -933,23 +928,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         );
       }
       fetchSchedules().catch(() => {});
-
-      // Phase 2 Step 5: Initialize tracking session from partner's actual GPS location
-      try {
-        const currentLoc = await locationService.getCurrentLocation();
-        if (currentLoc) {
-          await workerApiService.publishLiveLocation(
-            bId,
-            currentLoc.latitude,
-            currentLoc.longitude,
-            currentLoc.heading ?? 0,
-            currentLoc.speed ?? 0,
-            currentLoc.accuracy ?? 5.0
-          );
-        }
-      } catch (locErr: any) {
-        console.warn('[AppContext] Initial GPS publish on acceptance notice:', locErr?.message);
-      }
     } catch (err: any) {
       console.warn('[AppContext] acceptJob backend sync error:', err);
       const isConflict = err?.status === 409 || err?.isConflict || err?.response?.status === 409;
@@ -1113,21 +1091,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const bId = resolveBookingUuid(activeJob.bookingId, activeJob.id);
     if (newStatus === 'travelling') {
       workerApiService.startTravelling(bId).catch((e) => console.warn('[AppContext] startTravelling:', e?.message));
-      const custLat = activeJob.location?.latitude;
-      const custLng = activeJob.location?.longitude;
-      workerTrackingLifecycle.startTravelTracking(
-        bId,
-        (loc) => setWorkerLocation({ lat: loc.latitude, lng: loc.longitude }),
-        undefined,
-        custLat && custLng ? { latitude: custLat, longitude: custLng } : undefined
-      );
     } else if (newStatus === 'arrived') {
-      workerTrackingLifecycle.stopTracking(bId);
       if (activeJob.status !== 'arrived') {
         workerApiService.arriveAtCustomer(bId).catch((e) => console.warn('[AppContext] arriveAtCustomer:', e?.message));
       }
-    } else if (newStatus === 'started' || newStatus === 'completed') {
-      workerTrackingLifecycle.stopTracking(bId);
     }
   };
 

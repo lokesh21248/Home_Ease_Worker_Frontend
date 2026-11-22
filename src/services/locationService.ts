@@ -237,40 +237,18 @@ class LocationService {
   }
 
   /**
-   * Start live GPS tracking when online:
-   * Periodic updates (every 8-10 seconds) syncing with backend Redis GEO.
-   * Zero network pings when offline.
+   * Live GPS tracking disabled: no periodic background GPS tracking intervals
    */
   startLiveTracking(
     onLocationUpdate?: (location: LocationData) => void,
-    intervalMs: number = 10000
+    _intervalMs: number = 10000
   ): void {
-    if (this.isTrackingActive) {
-      return;
-    }
-    this.isTrackingActive = true;
-
-    // Immediately fetch initial location with geocoding
+    // Only fetch one-time static location for city/locality display if available
     this.getCurrentLocation(false).then((loc) => {
       if (loc) {
         onLocationUpdate?.(loc);
-        workerApiService.updateLiveLocation(loc.latitude, loc.longitude).catch(() => {});
       }
-    });
-
-    // Periodic heartbeat sync to Redis GEO via backend (skip geocode to preserve battery & performance)
-    this.trackingInterval = setInterval(async () => {
-      if (!this.isTrackingActive) return;
-      try {
-        const loc = await this.getCurrentLocation(true);
-        if (loc) {
-          onLocationUpdate?.(loc);
-          await workerApiService.updateLiveLocation(loc.latitude, loc.longitude);
-        }
-      } catch {
-        // Silent handling for interval
-      }
-    }, intervalMs);
+    }).catch(() => {});
   }
 
   /**

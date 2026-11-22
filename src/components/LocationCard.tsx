@@ -61,27 +61,14 @@ export const LocationCard: React.FC<LocationCardProps> = ({
 
       {/* Action Buttons */}
       <View style={styles.actionsRow}>
-        {onInAppNavigate && (
-          <TouchableOpacity
-            style={styles.inAppNavBtn}
-            onPress={onInAppNavigate}
-            activeOpacity={0.85}
-          >
-            <Navigation size={14} color={colors.textInverse} />
-            <Text style={styles.inAppNavBtnText}>Live GPS</Text>
-          </TouchableOpacity>
-        )}
-
         {onNavigate && (
           <TouchableOpacity
-            style={[styles.navBtn, Boolean(onInAppNavigate) && styles.navBtnSecondary]}
+            style={styles.navBtn}
             onPress={onNavigate}
             activeOpacity={0.85}
           >
-            <Navigation size={14} color={onInAppNavigate ? colors.primary : colors.textInverse} />
-            <Text style={[styles.navBtnText, Boolean(onInAppNavigate) && styles.navBtnSecondaryText]}>
-              Maps
-            </Text>
+            <Navigation size={15} color={colors.textInverse} />
+            <Text style={styles.navBtnText}>Directions (Maps)</Text>
           </TouchableOpacity>
         )}
 
@@ -91,8 +78,8 @@ export const LocationCard: React.FC<LocationCardProps> = ({
             onPress={onCall}
             activeOpacity={0.8}
           >
-            <Phone size={14} color={colors.primary} />
-            <Text style={styles.callBtnText}>Call</Text>
+            <Phone size={15} color={colors.primary} />
+            <Text style={styles.callBtnText}>Call Customer</Text>
           </TouchableOpacity>
         )}
       </View>

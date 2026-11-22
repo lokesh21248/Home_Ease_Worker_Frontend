@@ -676,51 +676,16 @@ class WorkerApiService {
    * POST http://3.108.55.219/api/v1/tracking/partner/location
    */
   public async publishLiveLocation(
-    bookingId: string,
-    lat: number,
-    lng: number,
-    bearing: number = 0,
-    speed: number = 0,
-    accuracy: number = 5.0,
-    timestamp: number = Date.now()
+    _bookingId: string,
+    _lat: number,
+    _lng: number,
+    _bearing: number = 0,
+    _speed: number = 0,
+    _accuracy: number = 5.0,
+    _timestamp: number = Date.now()
   ): Promise<any> {
-    const resolvedBookingId = resolveBookingUuid(bookingId);
-    const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
-
-    // 1. Dual-write heartbeat to port 8080 (updates worker table and last_location_updated_at)
-    this.sendLocationHeartbeat(lat, lng).catch(() => {});
-
-    // 2. Stream coordinate to port 8082 tracking microservice
-    try {
-      const trackingUrl = `${BASE_TRACKING_URL}${API_ENDPOINTS.TRACKING.PARTNER_LOCATION}`;
-      const payload = {
-        bookingId: resolvedBookingId,
-        lat,
-        lng,
-        bearing,
-        speed,
-        accuracy,
-        timestamp,
-        workerId: activeUserId,
-        partnerId: activeUserId,
-      };
-      const authToken = apiClient.getAuthToken();
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'X-User-Id': activeUserId,
-      };
-      if (authToken) {
-        headers['Authorization'] = `Bearer ${authToken}`;
-      }
-      const response = await axios.post(trackingUrl, payload, {
-        headers,
-        timeout: 5000,
-      });
-      return response.data;
-    } catch (error: any) {
-      console.warn('[WorkerApi] publishLiveLocation notice:', error?.message);
-      return null;
-    }
+    // Live tracking disabled: worker does not stream continuous GPS
+    return null;
   }
 
   /**
