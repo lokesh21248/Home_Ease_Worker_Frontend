@@ -32,7 +32,6 @@ import { openTurnByTurnNavigation } from '../../utils/navigationHelper';
 import { resolveBookingUuid } from '../../utils/uuid';
 import { storageService } from '../../services/storageService';
 import { workerApiService } from '../../api/workerApiService';
-import { workerTrackingLifecycle } from '../../services/TrackingLifecycleManager';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ActiveJob'>;
 
