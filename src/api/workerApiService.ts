@@ -760,7 +760,9 @@ class WorkerApiService {
     if (!token) return { status: 401, data: null };
     try {
       const response = await axios.post(
-        `${BASE_API_URL}/tracking/${resolvedBookingId}/device-status`,
+        // Core-owned endpoint via the non-v1 alias: today's production nginx sends /api/v1/tracking/{id}/... to the
+        // tracking service (404) but /api/... to the core; the updated nginx config routes both to the core.
+        `${BASE_API_URL.replace(/\/api\/v1\/?$/, '/api')}/tracking/${resolvedBookingId}/device-status`,
         { state },
         { headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, timeout: 6000 }
       );
