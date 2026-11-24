@@ -140,13 +140,12 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
     });
 
     (async () => {
-      try {
-        await workerApiService.startTravelling(bookingId);
-      } catch (e: any) {
-        // already ON_THE_WAY is fine; anything else is shown, not hidden
-        if (mounted && e?.status && e.status !== 409) {
-          Alert.alert('Could not start the trip', e?.message || 'Please try again.');
-        }
+      // The parent ActiveJob action is the SINGLE owner of the server travel transition.
+      // Opening/reopening navigation must never send a duplicate status change or try to
+      // bypass a failed backend transition.
+      if (job.status !== 'travelling') {
+        if (mounted) Alert.alert('Travel not started', 'Return to the job and tap Start Travelling first.');
+        return;
       }
       await workerTrackingLifecycle.startTravelTracking(
         bookingId,
