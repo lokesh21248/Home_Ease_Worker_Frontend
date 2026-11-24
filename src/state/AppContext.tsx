@@ -1074,53 +1074,55 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateJobStatus = async (newStatus: JobStatus): Promise<void> => {
-    if (!activeJob) return;
+    if (!activeJob) throw new Error('No active booking selected.');
 
     const bId = resolveBookingUuid(activeJob.bookingId, activeJob.id);
-
-    // Starting travel must be verified with backend ON_THE_WAY transition first!
+    // Always confirm the backend transition FIRST. Previously the UI switched to
+    // travelling while an unawaited API call could fail (401/403/409/500) silently.
+    // A customer then remained on STANDBY while the worker believed travel had started.
     if (newStatus === 'travelling' && activeJob.status !== 'travelling') {
       const currentWorkerId = worker.id || worker.userId;
       if (activeJob.workerId && currentWorkerId && activeJob.workerId !== currentWorkerId) {
         throw new Error('This booking is not assigned to your account.');
       }
-      try {
-        await workerApiService.startTravelling(bId);
-      } catch (e: any) {
-        const isConflict = e?.status === 409 || e?.isConflict || e?.response?.status === 409;
-        if (!isConflict) {
-          throw new Error(e?.response?.data?.message || e?.message || 'Server rejected starting travel.');
-        }
-      }
-      const custLat = (activeJob as any)?.customerLat ?? (activeJob as any)?.latitude;
-      const custLng = (activeJob as any)?.customerLng ?? (activeJob as any)?.longitude;
-      const customerLoc = custLat && custLng ? { lat: Number(custLat), lng: Number(custLng) } : undefined;
-      workerTrackingLifecycle.startTravelTracking(bId, undefined, undefined, customerLoc).catch((e) =>
-        console.warn('[AppContext] startTravelTracking:', e?.message)
-      );
+      await workerApiService.startTravelling(bId);
     }
 
     // Arrival is a server decision (it checks the partner's GPS against the saved address and issues the customer's
     // PIN). Confirm it BEFORE changing local state, and keep live tracking running until it is confirmed: the
     // server needs a fresh fix to accept the arrival. Errors propagate so the screen can show the reason.
     if (newStatus === 'arrived' && activeJob.status !== 'arrived') {
-      const arrivalBookingId = resolveBookingUuid(activeJob.bookingId, activeJob.id);
-      await workerApiService.arriveAtCustomer(arrivalBookingId);
-      await workerTrackingLifecycle.stopTracking(arrivalBookingId, 'ARRIVED', false);
+      await workerApiService.arriveAtCustomer(bId);
+      await workerTrackingLifecycle.stopTracking(bId, 'ARRIVED', false);
     }
 
     const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const updatedTimeline = { ...activeJob.timeline };
-
     if (newStatus === 'travelling') updatedTimeline.travellingAt = nowTime;
     if (newStatus === 'arrived') updatedTimeline.arrivedAt = nowTime;
     if (newStatus === 'started') updatedTimeline.startedAt = nowTime;
+    setActiveJob({ ...activeJob, status: newStatus, timeline: updatedTimeline });
 
-    setActiveJob({
-      ...activeJob,
-      status: newStatus,
-      timeline: updatedTimeline,
-    });
+    if (newStatus === 'travelling') {
+      // Server has accepted ON_THE_WAY. GPS can still be refused by Android permissions;
+      // keep the real booking status and expose the GPS problem instead of pretending LIVE.
+      const custLat = (activeJob as any)?.customerLat ?? activeJob.location?.latitude;
+      const custLng = (activeJob as any)?.customerLng ?? activeJob.location?.longitude;
+      const lat = Number(custLat);
+      const lng = Number(custLng);
+      const customerLoc = Number.isFinite(lat) && Number.isFinite(lng)
+        ? { lat, lng }
+        : undefined;
+      try {
+        const gps = await workerTrackingLifecycle.startTravelTracking(bId, undefined, undefined, customerLoc);
+        if (gps.state === 'PERMISSION_DENIED' || gps.state === 'GPS_DISABLED' || gps.state === 'AUTH_REQUIRED') {
+          setActiveBannerAlert(gps.message || 'GPS sharing is not active. Open Live Navigation to fix location access.');
+        }
+      } catch (e: any) {
+        console.warn('[AppContext] GPS startup failed:', e?.message);
+        setActiveBannerAlert('Trip started but GPS sharing failed. Open Live Navigation to retry.');
+      }
+    }
   };
 
   const completeActiveJob = async (completionData: {

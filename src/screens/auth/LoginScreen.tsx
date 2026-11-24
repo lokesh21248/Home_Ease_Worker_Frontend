@@ -18,7 +18,6 @@ import { borderRadius, shadows, spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { PremiumCard } from '../../components/PremiumCard';
 import { PrimaryButton } from '../../components/PrimaryButton';
-import { firebaseAuthService } from '../../services/firebaseAuthService';
 import { workerApiService } from '../../api/workerApiService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
@@ -47,12 +46,9 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
       setIsLoading(true);
       const fullNumber = `${countryCode}${cleanNumber}`;
 
-      try {
-        await workerApiService.sendOtp(fullNumber);
-      } catch (backendErr: any) {
-        console.warn('[LoginScreen] Live backend notice:', backendErr?.message);
-        await firebaseAuthService.signInWithPhoneNumber(cleanNumber, countryCode);
-      }
+      // Fail visibly if the OTP backend is unavailable. Mock Firebase tokens
+      // cannot authenticate GPS, booking transitions, or WebSocket topics.
+      await workerApiService.sendOtp(fullNumber);
 
       setIsLoading(false);
 

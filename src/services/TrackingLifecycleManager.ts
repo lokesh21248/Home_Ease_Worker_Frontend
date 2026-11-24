@@ -17,6 +17,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import workerApiService from '../api/workerApiService';
+import { apiClient } from '../api/client';
+import { storageService } from './storageService';
 import {
   LatestFixBuffer,
   classifyUploadResponse,
@@ -123,7 +125,10 @@ class WorkerTrackingLifecycleManager {
   }
 
   public isTrackingActive(bookingId?: string): boolean {
-    const active = this.activeBookingId !== null && this.status.state !== 'ENDED' && this.status.state !== 'IDLE';
+    // Failed GPS permission / disabled hardware means there is NO watcher to reuse.
+    // Allow a clean retry after the partner grants permissions or enables location services.
+    const active = this.activeBookingId !== null &&
+      !(['ENDED', 'IDLE', 'PERMISSION_DENIED', 'GPS_DISABLED', 'AUTH_REQUIRED'] as string[]).includes(this.status.state);
     return bookingId ? active && this.activeBookingId === bookingId : active;
   }
 
@@ -158,7 +163,10 @@ class WorkerTrackingLifecycleManager {
       if (dest) this.destination = dest;
       return this.status;
     }
-    if (this.activeBookingId && this.activeBookingId !== bookingId) {
+    if (this.activeBookingId &&
+        (this.activeBookingId !== bookingId || !this.isTrackingActive(bookingId))) {
+      // Also clean up a failed same-booking GPS session before retrying, otherwise old
+      // watchdogs / task state can survive permission-denied and GPS-disabled starts.
       await this.stopTracking(this.activeBookingId, 'STOPPED', false);
     }
 
@@ -280,6 +288,20 @@ class WorkerTrackingLifecycleManager {
   /** Background task entry point (may run after the OS restarted the JS runtime). */
   public async handleBackgroundGpsPoint(location: any): Promise<void> {
     if (!location?.coords) return;
+
+    // Android may re-create the JS runtime to deliver a headless location task.
+    // The API singleton then starts with no JWT even though the partner's session
+    // was saved on login. Recover the genuine stored JWT before GPS upload.
+    if (!apiClient.getAuthToken()) {
+      const session = await storageService.loadAuthSession();
+      if (!session.token || session.token.split('.').length !== 3) {
+        this.setStatus({ state: 'AUTH_REQUIRED', message: 'Sign in again to resume location sharing.' });
+        return;
+      }
+      apiClient.setAuthToken(session.token);
+      if (session.userId) apiClient.setUserId(session.userId);
+    }
+
     if (!this.activeBookingId) {
       try {
         const restored = await AsyncStorage.getItem(ACTIVE_BOOKING_KEY);

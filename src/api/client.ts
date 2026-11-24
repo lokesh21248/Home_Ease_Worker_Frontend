@@ -33,29 +33,14 @@ class ApiClient {
       },
     });
 
-    // Request Interceptor: injects valid JWT or verified fallback UUID credentials
+    // Only a signed session token may authorize actions. A UUID is an identifier,
+    // never an authentication credential; do not silently downgrade 401 responses.
     this.instance.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
-        const uid = this.getUserId();
-        const hasRealJwt = isJwtToken(this.authToken);
-        const authValue = hasRealJwt ? this.authToken!.trim() : uid;
-
-        if (config.headers) {
-          // Always ensure Authorization header is set with either signed JWT or fallback UUID
-          if (authValue) {
-            config.headers.Authorization = `Bearer ${authValue}`;
-            if (typeof config.headers.set === 'function') {
-              config.headers.set('Authorization', `Bearer ${authValue}`);
-            }
-          }
-
-          // Always inject X-User-Id header for backend tracking and worker resolution
-          if (uid) {
-            config.headers['X-User-Id'] = uid;
-            if (typeof config.headers.set === 'function') {
-              config.headers.set('X-User-Id', uid);
-            }
-          }
+        if (isJwtToken(this.authToken)) {
+          config.headers.Authorization = `Bearer ${this.authToken!.trim()}`;
+        } else {
+          delete config.headers.Authorization;
         }
         return config;
       },
@@ -69,32 +54,8 @@ class ApiClient {
         const status = error?.response?.status;
         const originalConfig = error?.config;
 
-        // Legacy behaviour kept ONLY for 401 (token missing/expired): purge it and retry once with the UUID fallback.
-        // A 403 means "signed in, but not allowed" (e.g. not this booking's partner). It is NOT an expired token:
-        // previously it also discarded the valid JWT, silently downgrading the whole session to the bare-UUID
-        // identity that the tracking, arrival and PIN endpoints refuse.
-        if (status === 401 && originalConfig && !originalConfig._retry) {
-          originalConfig._retry = true;
-          if (this.authToken && isJwtToken(this.authToken)) {
-            console.warn(`[ApiClient] Token rejected (HTTP ${status}). Retrying with verified partner credentials.`);
-            this.authToken = null;
-          }
-          const uid = this.getUserId();
-          if (originalConfig.headers) {
-            originalConfig.headers.Authorization = `Bearer ${uid}`;
-            originalConfig.headers['X-User-Id'] = uid;
-            if (typeof originalConfig.headers.set === 'function') {
-              originalConfig.headers.set('Authorization', `Bearer ${uid}`);
-              originalConfig.headers.set('X-User-Id', uid);
-            }
-          }
-          try {
-            return await this.instance(originalConfig);
-          } catch (retryErr: any) {
-            return Promise.reject(retryErr);
-          }
-        }
-
+        // The caller must reauthenticate on 401. Never retry a failed request
+        // using a hard-coded worker UUID or replace a valid token with an identity.
         if (error.response) {
           error.status = error.response.status;
           error.statusCode = error.response.status;

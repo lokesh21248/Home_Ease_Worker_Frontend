@@ -78,15 +78,14 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
     if (isStartingTravel) return;
     setIsStartingTravel(true);
     try {
+      // Do not open a travelling screen when Core refused the booking transition.
       await updateJobStatus('travelling');
       if (currentJob) {
-        navigation.navigate('NavigationTracking', {
-          job: { ...currentJob, status: 'travelling' },
-        });
+        navigation.navigate('NavigationTracking', { job: { ...currentJob, status: 'travelling' } });
       }
     } catch (e: any) {
       console.warn('[ActiveJobScreen] startTravelling:', e?.message);
-      Alert.alert('Could Not Start Travelling', e?.message || 'Server rejected starting travel. Please try again.');
+      Alert.alert('Could not start travelling', e?.message || 'Please check your connection and try again.');
     } finally {
       setIsStartingTravel(false);
     }
