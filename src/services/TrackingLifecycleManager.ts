@@ -123,7 +123,10 @@ class WorkerTrackingLifecycleManager {
   }
 
   public isTrackingActive(bookingId?: string): boolean {
-    const active = this.activeBookingId !== null && this.status.state !== 'ENDED' && this.status.state !== 'IDLE';
+    // Failed GPS permission / disabled hardware means there is NO watcher to reuse.
+    // Allow a clean retry after the partner grants permissions or enables location services.
+    const active = this.activeBookingId !== null &&
+      !(['ENDED', 'IDLE', 'PERMISSION_DENIED', 'GPS_DISABLED', 'AUTH_REQUIRED'] as string[]).includes(this.status.state);
     return bookingId ? active && this.activeBookingId === bookingId : active;
   }
 
@@ -158,7 +161,10 @@ class WorkerTrackingLifecycleManager {
       if (dest) this.destination = dest;
       return this.status;
     }
-    if (this.activeBookingId && this.activeBookingId !== bookingId) {
+    if (this.activeBookingId &&
+        (this.activeBookingId !== bookingId || !this.isTrackingActive(bookingId))) {
+      // Also clean up a failed same-booking GPS session before retrying, otherwise old
+      // watchdogs / task state can survive permission-denied and GPS-disabled starts.
       await this.stopTracking(this.activeBookingId, 'STOPPED', false);
     }
 
