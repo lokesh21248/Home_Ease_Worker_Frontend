@@ -17,11 +17,11 @@ import { borderRadius, shadows, spacing } from '../../theme/spacing';
 import { CustomHeader } from '../../components/CustomHeader';
 import { PremiumCard } from '../../components/PremiumCard';
 import { PrimaryButton } from '../../components/PrimaryButton';
-import { firebaseAuthService } from '../../services/firebaseAuthService';
 import { useApp } from '../../state/AppContext';
 import { workerApiService } from '../../api/workerApiService';
-import { apiClient } from '../../api/client';
+import { apiClient, isJwtToken } from '../../api/client';
 import { storageService } from '../../services/storageService';
+import { isValidUuid } from '../../utils/uuid';
 import { safeGoBack } from '../../utils/navigationHelper';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OtpVerification'>;
@@ -78,35 +78,25 @@ export const OtpVerificationScreen: React.FC<Props> = ({ navigation, route }) =>
       setErrorMessage('');
       const fullPhone = `${countryCode || '+91'}${phoneNumber}`;
 
-      let verifyResult: any = null;
-      let liveProfile: any = null;
-      try {
-        verifyResult = await workerApiService.verifyOtp(fullPhone, fullOtp);
-        if (verifyResult) {
-          const token = verifyResult.token || 'worker_verified_token';
-          const userId = verifyResult.userId || '1270d52d-9f4e-4399-9a80-15cab07f1763';
-          apiClient.setAuthToken(token);
-          apiClient.setUserId(userId);
-          const profileUpdate = {
-            id: userId,
-            name: verifyResult.fullName || '',
-            email: verifyResult.email || '',
-            phone: verifyResult.phoneNumber || fullPhone,
-          };
-          updateWorkerProfile(profileUpdate);
-          await storageService.saveAuthSession(token, userId);
-
-          liveProfile = await fetchWorkerProfile();
-        }
-      } catch (backendErr: any) {
-        console.warn('[OtpVerification] Live backend notice:', backendErr?.message);
-        const localAuth = await firebaseAuthService.confirmVerificationCode(fullOtp);
-        const token = localAuth.idToken;
-        const userId = localAuth.user.uid;
-        apiClient.setAuthToken(token);
-        apiClient.setUserId(userId);
-        await storageService.saveAuthSession(token, userId);
+      // The worker must hold a real backend-issued JWT and identity.
+      // A simulated Firebase token is not accepted by Spring Boot tracking.
+      const verifyResult = await workerApiService.verifyOtp(fullPhone, fullOtp);
+      const token = verifyResult?.token;
+      const userId = verifyResult?.userId;
+      if (!isJwtToken(token) || !isValidUuid(userId)) {
+        throw new Error('Backend did not return a valid worker session. Please retry OTP verification.');
       }
+      apiClient.setAuthToken(token);
+      apiClient.setUserId(userId);
+      await storageService.saveAuthSession(token, userId);
+      const profileUpdate = {
+        id: userId,
+        name: verifyResult.fullName || '',
+        email: verifyResult.email || '',
+        phone: verifyResult.phoneNumber || fullPhone,
+      };
+      updateWorkerProfile(profileUpdate);
+      const liveProfile = await fetchWorkerProfile();
 
       setIsVerifying(false);
       setIsAuthenticated(true);
@@ -129,11 +119,7 @@ export const OtpVerificationScreen: React.FC<Props> = ({ navigation, route }) =>
     if (timer > 0) return;
     try {
       const fullPhone = `${countryCode || '+91'}${phoneNumber}`;
-      try {
-        await workerApiService.sendOtp(fullPhone);
-      } catch {
-        await firebaseAuthService.resendCode();
-      }
+      await workerApiService.sendOtp(fullPhone);
       setTimer(30);
       setOtp(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
