@@ -73,12 +73,14 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const handleStartTravelling = async () => {
     try {
+      // Do not open a travelling screen when Core refused the booking transition.
       await updateJobStatus('travelling');
+      if (currentJob) {
+        navigation.navigate('NavigationTracking', { job: { ...currentJob, status: 'travelling' } });
+      }
     } catch (e: any) {
       console.warn('[ActiveJobScreen] startTravelling:', e?.message);
-    }
-    if (currentJob) {
-      navigation.navigate('NavigationTracking', { job: currentJob });
+      Alert.alert('Could not start travelling', e?.message || 'Please check your connection and try again.');
     }
   };
 
