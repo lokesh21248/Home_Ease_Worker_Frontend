@@ -71,23 +71,37 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
     currentJob?.id
   );
 
+  const [isStartingTravel, setIsStartingTravel] = useState(false);
+  const [isArriving, setIsArriving] = useState(false);
+
   const handleStartTravelling = async () => {
+    if (isStartingTravel) return;
+    setIsStartingTravel(true);
     try {
       await updateJobStatus('travelling');
+      if (currentJob) {
+        navigation.navigate('NavigationTracking', {
+          job: { ...currentJob, status: 'travelling' },
+        });
+      }
     } catch (e: any) {
       console.warn('[ActiveJobScreen] startTravelling:', e?.message);
-    }
-    if (currentJob) {
-      navigation.navigate('NavigationTracking', { job: currentJob });
+      Alert.alert('Could Not Start Travelling', e?.message || 'Server rejected starting travel. Please try again.');
+    } finally {
+      setIsStartingTravel(false);
     }
   };
 
   const handleMarkArrived = async () => {
+    if (isArriving) return;
+    setIsArriving(true);
     // AppContext confirms the arrival with the server first (it checks GPS proximity) and only then stops tracking.
     try {
       await updateJobStatus('arrived');
     } catch (e: any) {
       Alert.alert('Not marked as arrived', e?.message || 'Please try again when you reach the customer.');
+    } finally {
+      setIsArriving(false);
     }
   };
 

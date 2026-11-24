@@ -1076,6 +1076,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateJobStatus = async (newStatus: JobStatus): Promise<void> => {
     if (!activeJob) return;
 
+    const bId = resolveBookingUuid(activeJob.bookingId, activeJob.id);
+
+    // Starting travel must be verified with backend ON_THE_WAY transition first!
+    if (newStatus === 'travelling' && activeJob.status !== 'travelling') {
+      const currentWorkerId = worker.id || worker.userId;
+      if (activeJob.workerId && currentWorkerId && activeJob.workerId !== currentWorkerId) {
+        throw new Error('This booking is not assigned to your account.');
+      }
+      try {
+        await workerApiService.startTravelling(bId);
+      } catch (e: any) {
+        const isConflict = e?.status === 409 || e?.isConflict || e?.response?.status === 409;
+        if (!isConflict) {
+          throw new Error(e?.response?.data?.message || e?.message || 'Server rejected starting travel.');
+        }
+      }
+      const custLat = (activeJob as any)?.customerLat ?? (activeJob as any)?.latitude;
+      const custLng = (activeJob as any)?.customerLng ?? (activeJob as any)?.longitude;
+      const customerLoc = custLat && custLng ? { lat: Number(custLat), lng: Number(custLng) } : undefined;
+      workerTrackingLifecycle.startTravelTracking(bId, undefined, undefined, customerLoc).catch((e) =>
+        console.warn('[AppContext] startTravelTracking:', e?.message)
+      );
+    }
+
     // Arrival is a server decision (it checks the partner's GPS against the saved address and issues the customer's
     // PIN). Confirm it BEFORE changing local state, and keep live tracking running until it is confirmed: the
     // server needs a fresh fix to accept the arrival. Errors propagate so the screen can show the reason.
@@ -1097,18 +1121,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: newStatus,
       timeline: updatedTimeline,
     });
-
-    const bId = resolveBookingUuid(activeJob.bookingId, activeJob.id);
-    if (newStatus === 'travelling') {
-      workerApiService.startTravelling(bId).catch((e) => console.warn('[AppContext] startTravelling:', e?.message));
-      // Automatically activate GPS broadcasting with Android foreground service
-      const custLat = (activeJob as any)?.customerLat ?? (activeJob as any)?.latitude;
-      const custLng = (activeJob as any)?.customerLng ?? (activeJob as any)?.longitude;
-      const customerLoc = custLat && custLng ? { lat: Number(custLat), lng: Number(custLng) } : undefined;
-      workerTrackingLifecycle.startTravelTracking(bId, undefined, undefined, customerLoc).catch((e) =>
-        console.warn('[AppContext] startTravelTracking:', e?.message)
-      );
-    }
   };
 
   const completeActiveJob = async (completionData: {

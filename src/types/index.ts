@@ -102,6 +102,7 @@ export interface JobLocation {
 export interface Job {
   id: string;
   bookingId?: string; // Backend UUID e.g. c4d32e1a-8f90-4a12-b34c-9f8e7d6c5b4a
+  workerId?: string; // Assigned worker ID
   jobId: string; // Display code e.g. #HE-8492
   customer: Customer;
   serviceId: string;
