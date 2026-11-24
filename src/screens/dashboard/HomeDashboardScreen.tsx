@@ -178,7 +178,12 @@ export const HomeDashboardScreen: React.FC = () => {
                 });
               }}
               onPressNavigate={() => {
-                if (activeJob.location?.latitude && activeJob.location?.longitude) {
+                const bookingId = resolveBookingUuid(activeJob.bookingId, activeJob.id);
+                if (activeJob.status === 'travelling') {
+                  navigation.navigate('NavigationTracking', {
+                    job: { ...activeJob, bookingId },
+                  });
+                } else if (activeJob.location?.latitude && activeJob.location?.longitude) {
                   openTurnByTurnNavigation({
                     latitude: activeJob.location.latitude,
                     longitude: activeJob.location.longitude,
@@ -186,7 +191,6 @@ export const HomeDashboardScreen: React.FC = () => {
                     address: activeJob.location.address,
                   });
                 } else {
-                  const bookingId = resolveBookingUuid(activeJob.bookingId, activeJob.id);
                   navigation.navigate('ActiveJob', {
                     job: { ...activeJob, bookingId },
                     bookingId,

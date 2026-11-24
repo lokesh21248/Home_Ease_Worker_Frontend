@@ -71,9 +71,15 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
     currentJob?.id
   );
 
-  const handleStartTravelling = () => {
-    // updateJobStatus('travelling') calls workerApiService.startTravelling() internally
-    updateJobStatus('travelling');
+  const handleStartTravelling = async () => {
+    try {
+      await updateJobStatus('travelling');
+    } catch (e: any) {
+      console.warn('[ActiveJobScreen] startTravelling:', e?.message);
+    }
+    if (currentJob) {
+      navigation.navigate('NavigationTracking', { job: currentJob });
+    }
   };
 
   const handleMarkArrived = async () => {
@@ -499,13 +505,26 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
         )}
 
         {currentJob.status === 'travelling' && (
-          <PrimaryButton
-            title="I Have Arrived at Location"
-            size="lg"
-            fullWidth
-            onPress={handleMarkArrived}
-            icon={<Ionicons name="location-outline" size={20} color="#FFFFFF" />}
-          />
+          <View style={{ gap: spacing.sm, width: '100%' }}>
+            <PrimaryButton
+              title="Open Live Navigation Map"
+              size="lg"
+              fullWidth
+              onPress={() => {
+                if (currentJob) {
+                  navigation.navigate('NavigationTracking', { job: currentJob });
+                }
+              }}
+              icon={<Ionicons name="navigate-outline" size={20} color="#FFFFFF" />}
+            />
+            <SecondaryButton
+              title="I Have Arrived at Location"
+              size="lg"
+              fullWidth
+              onPress={handleMarkArrived}
+              icon={<Ionicons name="location-outline" size={20} color={colors.primary} />}
+            />
+          </View>
         )}
 
         {currentJob.status === 'arrived' && (
