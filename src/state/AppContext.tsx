@@ -444,6 +444,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (restoredJob) {
           setActiveJob(restoredJob);
           await storageService.saveActiveJob(restoredJob);
+          if (restoredJob.status === 'travelling') {
+            const bId = resolveBookingUuid(restoredJob.bookingId, restoredJob.id);
+            const custLat = (restoredJob as any)?.customerLat ?? restoredJob.location?.latitude;
+            const custLng = (restoredJob as any)?.customerLng ?? restoredJob.location?.longitude;
+            const lat = Number(custLat);
+            const lng = Number(custLng);
+            const customerLoc = Number.isFinite(lat) && Number.isFinite(lng)
+              ? { latitude: lat, longitude: lng }
+              : undefined;
+            void workerTrackingLifecycle.startTravelTracking(bId, undefined, undefined, customerLoc);
+          }
         } else {
           setActiveJob(null);
           await storageService.clearActiveJob();
@@ -522,16 +533,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         fetchJobRequests().catch(() => {});
       }, 100);
 
-      // Heartbeat every 20s (contract: 15-30s while online)
+      // Heartbeat every 20s (contract: 15-30s while online) using genuine device GPS only (no random jitter)
       heartbeatInterval = setInterval(() => {
-        setWorkerLocation((prev) => {
-          const next = {
-            lat: Number((prev.lat + (Math.random() - 0.5) * 0.0002).toFixed(6)),
-            lng: Number((prev.lng + (Math.random() - 0.5) * 0.0002).toFixed(6)),
-          };
-          workerApiService.sendLocationHeartbeat(next.lat, next.lng).catch(() => {});
-          return next;
-        });
+        locationService
+          .getCurrentLocation(true)
+          .then((loc) => {
+            if (!loc) return;
+            const next = { lat: loc.latitude, lng: loc.longitude };
+            setWorkerLocation(next);
+            workerApiService.sendLocationHeartbeat(next.lat, next.lng).catch(() => {});
+          })
+          .catch(() => {});
       }, 20000);
 
       // Poll incoming job dispatch requests every 15s
@@ -942,15 +954,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const rejectJob = async (jobId: string, reason?: string) => {
-    const job = jobRequests.find((j) => j.id === jobId || j.bookingId === jobId);
+    const job =
+      jobRequests.find((j) => j.id === jobId || j.bookingId === jobId) ||
+      (activeJob && (activeJob.id === jobId || activeJob.bookingId === jobId) ? activeJob : undefined);
+    const bId = resolveBookingUuid(job?.bookingId, jobId);
+
     setJobRequests((prev) => prev.filter((j) => j.id !== jobId && j.bookingId !== jobId));
-    setActiveBannerAlert(
-      '⚠️ Booking request rejected. Account temporarily blocked from new dispatches for 1 hour.'
-    );
+    if (activeJob && (activeJob.id === jobId || activeJob.bookingId === jobId || resolveBookingUuid(activeJob.bookingId, activeJob.id) === bId)) {
+      await workerTrackingLifecycle.stopTracking(bId, 'CANCELLED').catch(() => {});
+      setActiveJob(null);
+      await storageService.clearActiveJob();
+    } else {
+      setActiveBannerAlert(
+        '⚠️ Booking request rejected. Account temporarily blocked from new dispatches for 1 hour.'
+      );
+    }
 
     // End-to-end Backend Job Reject (POST /workers/bookings/{bookingId}/reject)
     try {
-      const bId = resolveBookingUuid(job?.bookingId, jobId);
       await workerApiService.rejectBooking(bId, job?.serviceId);
     } catch (err) {
       console.warn('[AppContext] rejectJob backend sync notice:', err);

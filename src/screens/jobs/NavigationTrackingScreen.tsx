@@ -135,6 +135,7 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
 
   useEffect(() => {
     let mounted = true;
+    let notStartedTimer: ReturnType<typeof setTimeout> | null = null;
     const unsubscribe = workerTrackingLifecycle.subscribeStatus((s) => {
       if (mounted) setTrackingStatus(s);
     });
@@ -144,7 +145,16 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
       // Opening/reopening navigation must never send a duplicate status change or try to
       // bypass a failed backend transition.
       if (job.status !== 'travelling') {
-        if (mounted) Alert.alert('Travel not started', 'Return to the job and tap Start Travelling first.');
+        if (job.status === 'accepted') {
+          // Give React state/router one beat to flush the newly transitioned status before alerting.
+          notStartedTimer = setTimeout(() => {
+            if (mounted) {
+              Alert.alert('Travel not started', 'Return to the job and tap Start Travelling first.');
+            }
+          }, 700);
+        } else if (mounted) {
+          Alert.alert('Travel not started', 'Return to the job and tap Start Travelling first.');
+        }
         return;
       }
       await workerTrackingLifecycle.startTravelTracking(
@@ -182,10 +192,11 @@ export const NavigationTrackingScreen: React.FC<Props> = ({ navigation, route })
 
     return () => {
       mounted = false;
+      if (notStartedTimer) clearTimeout(notStartedTimer);
       unsubscribe();
       // Leaving the screen does NOT stop sharing: the partner is still travelling (background task keeps going).
     };
-  }, [bookingId, job.location.latitude, job.location.longitude, loadRoute]);
+  }, [bookingId, job.status, job.location.latitude, job.location.longitude, loadRoute]);
 
   // ───────────────────────── actions ─────────────────────────
 

@@ -696,6 +696,8 @@ class WorkerApiService {
    * header (which the server no longer trusts), swallowed every error, and on any failure posted the same fix a
    * second time to another endpoint. Now it returns the HTTP status so the upload loop can retry, stop or re-auth.
    */
+  private loggedFirstFixForBooking = new Set<string>();
+
   public async publishLiveLocation(
     bookingId: string,
     lat: number,
@@ -707,7 +709,10 @@ class WorkerApiService {
   ): Promise<TrackingCallResult> {
     const resolvedBookingId = resolveBookingUuid(bookingId);
     const token = signedToken();
-    if (!token) return { status: 401, data: null };
+    if (!token) {
+      console.warn(`[Tracking] GPS upload skipped for ${resolvedBookingId}: 401 (no signed JWT)`);
+      return { status: 401, data: null };
+    }
     const payload = {
       bookingId: resolvedBookingId,
       lat,
@@ -722,9 +727,18 @@ class WorkerApiService {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         timeout: 6000,
       });
+      if (!this.loggedFirstFixForBooking.has(resolvedBookingId)) {
+        this.loggedFirstFixForBooking.add(resolvedBookingId);
+        console.log(`[Tracking] First GPS fix accepted for ${resolvedBookingId} (HTTP ${response.status})`);
+      }
       return { status: response.status, data: response.data };
     } catch (error: any) {
-      return { status: error?.response?.status ?? null, data: error?.response?.data ?? null };
+      const httpStatus: number | null = error?.response?.status ?? null;
+      const errMsg = error?.response?.data?.message || error?.message || 'network_error';
+      console.warn(
+        `[Tracking] GPS upload failed for ${resolvedBookingId}: HTTP ${httpStatus ?? 'NETWORK'} (${errMsg})`
+      );
+      return { status: httpStatus, data: error?.response?.data ?? null };
     }
   }
 
@@ -733,6 +747,7 @@ class WorkerApiService {
    */
   public async stopTrackingSession(bookingId: string, reason: string = 'STOPPED'): Promise<TrackingCallResult> {
     const resolvedBookingId = resolveBookingUuid(bookingId);
+    this.loggedFirstFixForBooking.delete(resolvedBookingId);
     const token = signedToken();
     if (!token) return { status: 401, data: null };
     try {
@@ -743,7 +758,9 @@ class WorkerApiService {
       );
       return { status: response.status, data: response.data };
     } catch (error: any) {
-      return { status: error?.response?.status ?? null, data: error?.response?.data ?? null };
+      const httpStatus: number | null = error?.response?.status ?? null;
+      console.warn(`[Tracking] Stop tracking failed for ${resolvedBookingId}: HTTP ${httpStatus ?? 'NETWORK'}`);
+      return { status: httpStatus, data: error?.response?.data ?? null };
     }
   }
 

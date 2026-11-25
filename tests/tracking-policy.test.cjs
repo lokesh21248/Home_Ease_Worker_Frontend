@@ -128,3 +128,30 @@ test('manoeuvre codes map to matching icons, unknown codes never show a turn', (
   assert.equal(maneuverIcon('STRAIGHT'), 'arrow-up');
   assert.equal(maneuverIcon(undefined), 'arrow-up');
 });
+
+test('worker app tracks job.status changes, resumes travelling GPS on relaunch, and avoids fake heartbeat jitter', () => {
+  const path = require('node:path');
+  const navScreen = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'screens', 'jobs', 'NavigationTrackingScreen.tsx'),
+    'utf8',
+  );
+  const appCtx = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'state', 'AppContext.tsx'),
+    'utf8',
+  );
+  assert.match(
+    navScreen,
+    /\[bookingId,\s*job\.status,\s*job\.location\.latitude,\s*job\.location\.longitude,\s*loadRoute\]/,
+    'NavigationTrackingScreen must re-evaluate GPS startup when job.status transitions to travelling',
+  );
+  assert.equal(
+    appCtx.includes('Math.random() - 0.5) * 0.0002'),
+    false,
+    'heartbeat interval must never synthesize fake GPS coordinate jitter',
+  );
+  assert.equal(
+    appCtx.includes("restoredJob.status === 'travelling'"),
+    true,
+    'AppContext restorePersistedState must resume live tracking if active job is travelling',
+  );
+});
