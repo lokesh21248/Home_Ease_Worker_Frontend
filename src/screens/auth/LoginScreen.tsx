@@ -19,14 +19,26 @@ import { typography } from '../../theme/typography';
 import { PremiumCard } from '../../components/PremiumCard';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { workerApiService } from '../../api/workerApiService';
+import { useApp } from '../../state/AppContext';
+import { apiClient } from '../../api/client';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
 export const LoginScreen: React.FC<Props> = ({ navigation }) => {
+  const { setIsAuthenticated } = useApp();
   const [countryCode] = useState('+91');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  const handleSkipAuth = () => {
+    setIsAuthenticated(true);
+    apiClient.setUserId('1270d52d-9f4e-4399-9a80-15cab07f1763');
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'MainTabs' }],
+    });
+  };
 
   const handleContinue = async () => {
     setError('');
@@ -118,6 +130,15 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
               icon={<Ionicons name="shield-checkmark-outline" size={18} color="#FFFFFF" />}
               style={styles.continueBtn}
             />
+
+            <TouchableOpacity
+              style={styles.skipAuthBtn}
+              onPress={handleSkipAuth}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="flash-outline" size={16} color={colors.primary} />
+              <Text style={styles.skipAuthBtnText}>Skip Authentication & Enter Dashboard</Text>
+            </TouchableOpacity>
 
             <View style={styles.termsBox}>
               <Text style={styles.termsText}>
@@ -232,6 +253,24 @@ const styles = StyleSheet.create({
   },
   continueBtn: {
     marginTop: spacing.lg,
+  },
+  skipAuthBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: spacing.md,
+    paddingVertical: 12,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.primaryLight,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  skipAuthBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primary,
   },
   termsBox: {
     marginTop: spacing.md,

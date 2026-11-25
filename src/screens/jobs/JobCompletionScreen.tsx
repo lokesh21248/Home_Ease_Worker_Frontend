@@ -30,6 +30,30 @@ export const JobCompletionScreen: React.FC<Props> = ({ navigation, route }) => {
   const { job } = route.params;
   const { completeActiveJob } = useApp();
 
+  const basePrice = job.price || 0;
+  const extraAddOnsTotal = (job.subServices || []).reduce(
+    (acc, sub) => acc + sub.quantity * sub.price,
+    0
+  );
+  const totalBillAmount =
+    job.totalAmount && job.totalAmount > basePrice
+      ? job.totalAmount
+      : basePrice + extraAddOnsTotal;
+  const isOnlinePrepaid =
+    job.paymentMode === 'Online Pre-paid' && extraAddOnsTotal === 0;
+  const remainingDue = isOnlinePrepaid
+    ? 0
+    : job.paymentMode === 'Online Pre-paid'
+    ? extraAddOnsTotal
+    : totalBillAmount;
+
+  const [paymentMethodCollected, setPaymentMethodCollected] = useState<'Cash' | 'UPI'>(
+    job.paymentMode === 'UPI at Destination' ? 'UPI' : 'Cash'
+  );
+  const [hasConfirmedCollection, setHasConfirmedCollection] = useState<boolean>(
+    remainingDue === 0
+  );
+
   const [beforeImage, setBeforeImage] = useState<string | null>(null);
   const [afterImage, setAfterImage] = useState<string | null>(null);
   const [hasSignature, setHasSignature] = useState<boolean>(false);
@@ -38,6 +62,23 @@ export const JobCompletionScreen: React.FC<Props> = ({ navigation, route }) => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const handleSubmit = async () => {
+    if (remainingDue > 0 && !hasConfirmedCollection) {
+      Alert.alert(
+        'Payment Collection Required',
+        `Please collect ₹${remainingDue} from the customer before submitting completion.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: `Confirm ₹${remainingDue} Collected`,
+            onPress: () => {
+              setHasConfirmedCollection(true);
+            },
+          },
+        ]
+      );
+      return;
+    }
+
     const finalBefore = beforeImage || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=400';
     const finalAfter = afterImage || 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=400';
 
@@ -92,6 +133,139 @@ export const JobCompletionScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
           <Text style={styles.ribbonAmount}>₹{job.netPayout}</Text>
         </View>
+
+        {/* Payment Collection & Verification Card (Pronto Style) */}
+        <PremiumCard style={styles.paymentCard}>
+          <View style={styles.paymentHeaderRow}>
+            <View>
+              <Text style={styles.paymentCardTitle}>Customer Payment Settlement</Text>
+              <Text style={styles.paymentModeLabel}>
+                Billing Mode: <Text style={{ fontWeight: '700' }}>{job.paymentMode || 'Cash on Delivery'}</Text>
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.paymentStatusBadge,
+                remainingDue === 0 || hasConfirmedCollection
+                  ? styles.badgePaid
+                  : styles.badgePending,
+              ]}
+            >
+              <Ionicons
+                name={
+                  remainingDue === 0 || hasConfirmedCollection
+                    ? 'checkmark-circle'
+                    : 'alert-circle'
+                }
+                size={14}
+                color={
+                  remainingDue === 0 || hasConfirmedCollection
+                    ? '#16A34A'
+                    : '#D97706'
+                }
+              />
+              <Text
+                style={[
+                  styles.paymentBadgeText,
+                  remainingDue === 0 || hasConfirmedCollection
+                    ? styles.textPaid
+                    : styles.textPending,
+                ]}
+              >
+                {remainingDue === 0
+                  ? 'PRE-PAID ONLINE'
+                  : hasConfirmedCollection
+                  ? 'COLLECTED'
+                  : 'PENDING COLLECTION'}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.amountCollectBox}>
+            <Text style={styles.amountCollectLabel}>
+              {remainingDue === 0 ? 'Total Order Amount' : 'Amount to Collect from Customer'}
+            </Text>
+            <Text style={styles.amountCollectValue}>₹{remainingDue === 0 ? totalBillAmount : remainingDue}</Text>
+          </View>
+
+          {remainingDue > 0 && (
+            <View style={styles.collectionActionSection}>
+              <Text style={styles.methodSelectLabel}>Payment Received Via:</Text>
+              <View style={styles.paymentMethodPills}>
+                <TouchableOpacity
+                  style={[
+                    styles.methodPill,
+                    paymentMethodCollected === 'Cash' && styles.methodPillActive,
+                  ]}
+                  onPress={() => setPaymentMethodCollected('Cash')}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons
+                    name="cash-outline"
+                    size={16}
+                    color={paymentMethodCollected === 'Cash' ? '#FFFFFF' : colors.textPrimary}
+                  />
+                  <Text
+                    style={[
+                      styles.methodPillText,
+                      paymentMethodCollected === 'Cash' && styles.methodPillTextActive,
+                    ]}
+                  >
+                    Cash
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.methodPill,
+                    paymentMethodCollected === 'UPI' && styles.methodPillActive,
+                  ]}
+                  onPress={() => setPaymentMethodCollected('UPI')}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons
+                    name="qr-code-outline"
+                    size={16}
+                    color={paymentMethodCollected === 'UPI' ? '#FFFFFF' : colors.textPrimary}
+                  />
+                  <Text
+                    style={[
+                      styles.methodPillText,
+                      paymentMethodCollected === 'UPI' && styles.methodPillTextActive,
+                    ]}
+                  >
+                    UPI / QR
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  styles.confirmCollectionToggle,
+                  hasConfirmedCollection && styles.confirmCollectionToggleActive,
+                ]}
+                onPress={() => setHasConfirmedCollection(!hasConfirmedCollection)}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name={hasConfirmedCollection ? 'checkbox' : 'square-outline'}
+                  size={22}
+                  color={hasConfirmedCollection ? '#16A34A' : colors.textSecondary}
+                />
+                <Text
+                  style={[
+                    styles.confirmCollectionText,
+                    hasConfirmedCollection && styles.confirmCollectionTextActive,
+                  ]}
+                >
+                  {hasConfirmedCollection
+                    ? `✓ Confirmed: ₹${remainingDue} received in ${paymentMethodCollected}`
+                    : `I have collected ₹${remainingDue} in ${paymentMethodCollected}`}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </PremiumCard>
 
         {/* Before and After Proofs Upload UI */}
         <PremiumCard style={styles.card}>
@@ -509,6 +683,134 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     color: colors.primary,
+  },
+  paymentCard: {
+    marginBottom: spacing.md,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+  },
+  paymentHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: spacing.sm,
+  },
+  paymentCardTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  paymentModeLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  paymentStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: borderRadius.full,
+  },
+  badgePending: {
+    backgroundColor: '#FEF3C7',
+  },
+  badgePaid: {
+    backgroundColor: '#DCFCE7',
+  },
+  paymentBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  textPending: {
+    color: '#D97706',
+  },
+  textPaid: {
+    color: '#16A34A',
+  },
+  amountCollectBox: {
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.sm,
+  },
+  amountCollectLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  amountCollectValue: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: colors.textPrimary,
+    marginTop: 2,
+  },
+  collectionActionSection: {
+    marginTop: spacing.xs,
+  },
+  methodSelectLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  paymentMethodPills: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  methodPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  methodPillActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  methodPillText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  methodPillTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  confirmCollectionToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: spacing.sm + 2,
+    backgroundColor: '#F8FAFC',
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  confirmCollectionToggleActive: {
+    backgroundColor: '#F0FDF4',
+    borderColor: '#86EFAC',
+  },
+  confirmCollectionText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    flex: 1,
+  },
+  confirmCollectionTextActive: {
+    color: '#16A34A',
+    fontWeight: '700',
   },
 });
 

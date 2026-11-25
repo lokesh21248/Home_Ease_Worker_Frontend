@@ -73,16 +73,31 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const [isStartingTravel, setIsStartingTravel] = useState(false);
   const [isArriving, setIsArriving] = useState(false);
+  const [isCashCollectedMarked, setIsCashCollectedMarked] = useState<boolean>(false);
+  const [showQrModal, setShowQrModal] = useState<boolean>(false);
+
+  const basePrice = currentJob?.price || 0;
+  const extraAddOnsTotal = (currentJob?.subServices || []).reduce(
+    (acc, sub) => acc + sub.quantity * sub.price,
+    0
+  );
+  const totalBillAmount =
+    currentJob?.totalAmount && currentJob.totalAmount > basePrice
+      ? currentJob.totalAmount
+      : basePrice + extraAddOnsTotal;
+  const isOnlinePrepaid =
+    currentJob?.paymentMode === 'Online Pre-paid' && extraAddOnsTotal === 0;
+  const paymentRemaining = isOnlinePrepaid
+    ? 0
+    : currentJob?.paymentMode === 'Online Pre-paid'
+    ? extraAddOnsTotal
+    : totalBillAmount;
 
   const handleStartTravelling = async () => {
     if (isStartingTravel) return;
     setIsStartingTravel(true);
     try {
-      // Do not open a travelling screen when Core refused the booking transition.
       await updateJobStatus('travelling');
-      if (currentJob) {
-        navigation.navigate('NavigationTracking', { job: { ...currentJob, status: 'travelling' } });
-      }
     } catch (e: any) {
       console.warn('[ActiveJobScreen] startTravelling:', e?.message);
       Alert.alert('Could not start travelling', e?.message || 'Please check your connection and try again.');
@@ -423,6 +438,132 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
           style={{ marginBottom: spacing.md }}
         />
 
+        {/* Pronto-Style Payment Remaining / Collection Card */}
+        <PremiumCard style={styles.paymentCard}>
+          <View style={styles.paymentCardHeader}>
+            <View style={styles.paymentBadgeRow}>
+              <View
+                style={[
+                  styles.paymentStatusBadge,
+                  paymentRemaining === 0 || isCashCollectedMarked
+                    ? styles.badgePaid
+                    : styles.badgePending,
+                ]}
+              >
+                <Ionicons
+                  name={
+                    paymentRemaining === 0 || isCashCollectedMarked
+                      ? 'checkmark-circle'
+                      : 'cash-outline'
+                  }
+                  size={14}
+                  color={
+                    paymentRemaining === 0 || isCashCollectedMarked
+                      ? '#16A34A'
+                      : '#D97706'
+                  }
+                />
+                <Text
+                  style={[
+                    styles.paymentStatusBadgeText,
+                    paymentRemaining === 0 || isCashCollectedMarked
+                      ? styles.textPaid
+                      : styles.textPending,
+                  ]}
+                >
+                  {paymentRemaining === 0 || isCashCollectedMarked
+                    ? 'PAYMENT SETTLED'
+                    : 'PAYMENT DUE AT DOORSTEP'}
+                </Text>
+              </View>
+              <Text style={styles.paymentModeText}>
+                {currentJob.paymentMode || 'Cash on Delivery'}
+              </Text>
+            </View>
+
+            <View style={styles.amountDisplayRow}>
+              <View>
+                <Text style={styles.amountLabel}>
+                  {paymentRemaining === 0 || isCashCollectedMarked
+                    ? 'Total Order Value'
+                    : 'Remaining Amount to Collect'}
+                </Text>
+                <Text style={styles.amountValue}>
+                  ₹
+                  {paymentRemaining === 0
+                    ? totalBillAmount
+                    : isCashCollectedMarked
+                    ? 0
+                    : paymentRemaining}
+                </Text>
+              </View>
+              {paymentRemaining > 0 && !isCashCollectedMarked && (
+                <TouchableOpacity
+                  style={styles.qrCodeBtn}
+                  onPress={() => setShowQrModal(true)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="qr-code-outline" size={16} color={colors.primary} />
+                  <Text style={styles.qrBtnText}>Show UPI QR</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* Breakdown details */}
+          <View style={styles.breakdownContainer}>
+            <View style={styles.breakdownRow}>
+              <Text style={styles.breakdownLbl}>
+                Base Service Fare ({currentJob.serviceName})
+              </Text>
+              <Text style={styles.breakdownVal}>₹{basePrice}</Text>
+            </View>
+            {extraAddOnsTotal > 0 && (
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLbl}>
+                  Added Extras / Sub-Services ({currentJob.subServices?.length} items)
+                </Text>
+                <Text style={[styles.breakdownVal, { color: colors.primary }]}>
+                  +₹{extraAddOnsTotal}
+                </Text>
+              </View>
+            )}
+            <View style={styles.breakdownDivider} />
+            <View style={styles.breakdownRow}>
+              <Text style={styles.breakdownTotalLbl}>Total Customer Bill</Text>
+              <Text style={styles.breakdownTotalVal}>₹{totalBillAmount}</Text>
+            </View>
+          </View>
+
+          {/* Quick Cash Collected Toggle */}
+          {paymentRemaining > 0 && (
+            <TouchableOpacity
+              style={[
+                styles.collectConfirmToggle,
+                isCashCollectedMarked && styles.collectConfirmToggleActive,
+              ]}
+              onPress={() => setIsCashCollectedMarked(!isCashCollectedMarked)}
+              activeOpacity={0.8}
+            >
+              <Ionicons
+                name={isCashCollectedMarked ? 'checkbox' : 'square-outline'}
+                size={20}
+                color={isCashCollectedMarked ? '#16A34A' : colors.textSecondary}
+              />
+              <Text
+                style={[
+                  styles.collectConfirmText,
+                  isCashCollectedMarked && styles.collectConfirmTextActive,
+                ]}
+              >
+                {isCashCollectedMarked
+                  ? `✓ ₹${paymentRemaining} Collected from Customer`
+                  : `Mark ₹${paymentRemaining} Received via Cash/UPI`}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </PremiumCard>
+
         {/* Service Standard Checklist */}
         <PremiumCard style={styles.card}>
           <View style={styles.checklistHeaderRow}>
@@ -520,22 +661,26 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
         {currentJob.status === 'travelling' && (
           <View style={{ gap: spacing.sm, width: '100%' }}>
             <PrimaryButton
-              title="Open Live Navigation Map"
-              size="lg"
-              fullWidth
-              onPress={() => {
-                if (currentJob) {
-                  navigation.navigate('NavigationTracking', { job: currentJob });
-                }
-              }}
-              icon={<Ionicons name="navigate-outline" size={20} color="#FFFFFF" />}
-            />
-            <SecondaryButton
               title="I Have Arrived at Location"
               size="lg"
               fullWidth
+              loading={isArriving}
               onPress={handleMarkArrived}
-              icon={<Ionicons name="location-outline" size={20} color={colors.primary} />}
+              icon={<Ionicons name="location-outline" size={20} color="#FFFFFF" />}
+            />
+            <SecondaryButton
+              title="Directions (Google Maps)"
+              size="lg"
+              fullWidth
+              onPress={() =>
+                openTurnByTurnNavigation({
+                  latitude: currentJob.location.latitude,
+                  longitude: currentJob.location.longitude,
+                  label: `${currentJob.customer.name} - ${currentJob.serviceName}`,
+                  address: currentJob.location.address,
+                })
+              }
+              icon={<Ionicons name="navigate-outline" size={20} color={colors.primary} />}
             />
           </View>
         )}
@@ -727,6 +872,52 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
               fullWidth
               onPress={handleConfirmUpsell}
               style={{ marginTop: spacing.md }}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* UPI QR Payment Modal */}
+      <Modal visible={showQrModal} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.qrModalCard}>
+            <View style={styles.qrModalHeader}>
+              <View>
+                <Text style={styles.qrModalTitle}>Scan to Pay UPI</Text>
+                <Text style={styles.qrModalSubtitle}>Amount: ₹{paymentRemaining}</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowQrModal(false)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="close" size={22} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.qrImageContainer}>
+              <Image
+                source={{
+                  uri: `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=upi%3A%2F%2Fpay%3Fpa%3Dhomeease.pay%40okhdfcbank%26pn%3DHomeEase%26am%3D${paymentRemaining}%26cu%3DINR%26tn%3DBooking_${currentJob.jobId}`,
+                }}
+                style={styles.qrImage}
+              />
+            </View>
+
+            <Text style={styles.qrInstructionText}>
+              Ask customer to scan using Google Pay, PhonePe, Paytm or any UPI app.
+            </Text>
+
+            <PrimaryButton
+              title={`Confirm ₹${paymentRemaining} Collected via UPI`}
+              size="lg"
+              fullWidth
+              onPress={() => {
+                setIsCashCollectedMarked(true);
+                setShowQrModal(false);
+                Alert.alert('Payment Received', `₹${paymentRemaining} recorded via UPI.`);
+              }}
+              style={{ marginTop: spacing.md }}
+              icon={<Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />}
             />
           </View>
         </View>
@@ -1298,6 +1489,193 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: colors.danger,
+  },
+  paymentCard: {
+    marginBottom: spacing.md,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+  },
+  paymentCardHeader: {
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  paymentBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  paymentStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: borderRadius.full,
+  },
+  badgePending: {
+    backgroundColor: '#FEF3C7',
+  },
+  badgePaid: {
+    backgroundColor: '#DCFCE7',
+  },
+  paymentStatusBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  textPending: {
+    color: '#D97706',
+  },
+  textPaid: {
+    color: '#16A34A',
+  },
+  paymentModeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  amountDisplayRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    marginTop: spacing.xs,
+  },
+  amountLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+  amountValue: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: colors.textPrimary,
+    letterSpacing: -0.5,
+    marginTop: 2,
+  },
+  qrCodeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  qrBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  breakdownContainer: {
+    paddingTop: spacing.sm,
+    gap: 6,
+  },
+  breakdownRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  breakdownLbl: {
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+  breakdownVal: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  breakdownDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: 4,
+  },
+  breakdownTotalLbl: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  breakdownTotalVal: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.primary,
+  },
+  collectConfirmToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: spacing.md,
+    padding: spacing.sm + 2,
+    backgroundColor: '#F8FAFC',
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  collectConfirmToggleActive: {
+    backgroundColor: '#F0FDF4',
+    borderColor: '#86EFAC',
+  },
+  collectConfirmText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    flex: 1,
+  },
+  collectConfirmTextActive: {
+    color: '#16A34A',
+    fontWeight: '700',
+  },
+  qrModalCard: {
+    width: '90%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: borderRadius.xl,
+    padding: spacing.xl,
+    alignItems: 'center',
+    ...shadows.md,
+  },
+  qrModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    width: '100%',
+    marginBottom: spacing.md,
+  },
+  qrModalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.textPrimary,
+  },
+  qrModalSubtitle: {
+    fontSize: 13,
+    color: colors.primary,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  qrImageContainer: {
+    width: 220,
+    height: 220,
+    backgroundColor: '#FFFFFF',
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: spacing.md,
+    overflow: 'hidden',
+  },
+  qrImage: {
+    width: 200,
+    height: 200,
+  },
+  qrInstructionText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 17,
+    paddingHorizontal: spacing.sm,
   },
 });
 

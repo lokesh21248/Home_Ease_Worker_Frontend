@@ -13,7 +13,7 @@ import { useApp } from '../../state/AppContext';
 type Props = NativeStackScreenProps<RootStackParamList, 'Splash'>;
 
 export const SplashScreen: React.FC<Props> = ({ navigation }) => {
-  const { isAuthenticated } = useApp();
+  const { isAuthenticated, setIsAuthenticated } = useApp();
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -22,10 +22,18 @@ export const SplashScreen: React.FC<Props> = ({ navigation }) => {
           index: 0,
           routes: [{ name: 'MainTabs' }],
         });
-      }, 1200);
+      }, 300);
       return () => clearTimeout(timer);
     }
   }, [isAuthenticated, navigation]);
+
+  const handleSkipAuth = () => {
+    setIsAuthenticated(true);
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'MainTabs' }],
+    });
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -73,10 +81,13 @@ export const SplashScreen: React.FC<Props> = ({ navigation }) => {
 
         <TouchableOpacity
           activeOpacity={0.7}
-          onPress={() => navigation.navigate('MainTabs', { screen: 'HomeTab' })}
+          onPress={handleSkipAuth}
           style={styles.demoLink}
         >
-          <Text style={styles.demoLinkText}>Explore Partner Dashboard (Demo Mode)</Text>
+          <View style={styles.skipButtonContainer}>
+            <Ionicons name="flash-outline" size={16} color={colors.primary} />
+            <Text style={styles.demoLinkText}>Skip & Enter Dashboard (Instant Access)</Text>
+          </View>
         </TouchableOpacity>
 
         <View style={styles.trustRow}>
@@ -183,10 +194,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.md,
   },
+  skipButtonContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   demoLinkText: {
     fontSize: 13,
     color: colors.primary,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   trustRow: {
     flexDirection: 'row',
