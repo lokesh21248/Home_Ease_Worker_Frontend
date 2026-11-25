@@ -154,4 +154,13 @@ test('worker app tracks job.status changes, resumes travelling GPS on relaunch, 
     true,
     'AppContext restorePersistedState must resume live tracking if active job is travelling',
   );
+  const activeJobScreen = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'screens', 'jobs', 'ActiveJobScreen.tsx'),
+    'utf8',
+  );
+  assert.equal(
+    activeJobScreen.includes('Doorstep Override'),
+    false,
+    'ActiveJobScreen must never bypass server PIN verification',
+  );
 });
