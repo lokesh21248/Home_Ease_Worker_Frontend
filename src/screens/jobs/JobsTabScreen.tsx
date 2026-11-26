@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ScrollView,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppNavigation as useNavigation } from '../../navigation/useAppNavigation';
@@ -114,13 +115,24 @@ export const JobsTabScreen: React.FC = () => {
     }
   };
 
-  const handleAccept = (item: Job) => {
+  const handleAccept = async (item: Job) => {
     const bookingId = resolveBookingUuid(item.bookingId, item.id);
-    acceptJob(bookingId);
-    navigation.navigate('ActiveJob', {
-      job: { ...item, id: bookingId, bookingId, status: 'accepted' },
-      bookingId,
-    });
+    try {
+      await acceptJob(bookingId);
+      navigation.navigate('ActiveJob', {
+        job: { ...item, id: bookingId, bookingId, status: 'accepted' },
+        bookingId,
+      });
+    } catch (err: any) {
+      if (err?.status === 409 || err?.isConflict) {
+        Alert.alert(
+          'Job Already Accepted',
+          'Another nearby partner accepted this request faster.'
+        );
+      } else {
+        Alert.alert('Notice', err?.message || 'Failed to accept booking.');
+      }
+    }
   };
 
   const handleReject = (item: Job) => {

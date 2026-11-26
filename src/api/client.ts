@@ -7,13 +7,47 @@ export { BASE_API_URL };
 export const DEFAULT_WORKER_USER_ID = '1270d52d-9f4e-4399-9a80-15cab07f1763';
 export const DEFAULT_WORKER_PROFILE_ID = '9aaff45e-1baf-4f39-b26f-2fcd2b438f5b';
 
+function decodeBase64Url(input: string): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+  const normalized = input.replace(/-/g, '+').replace(/_/g, '/');
+  const str = normalized.replace(/=+$/, '');
+  let output = '';
+  for (let bc = 0, bs = 0, idx = 0; idx < str.length; idx++) {
+    const charIndex = chars.indexOf(str.charAt(idx));
+    if (charIndex === -1) continue;
+    bs = bc % 4 ? bs * 64 + charIndex : charIndex;
+    if (bc++ % 4) {
+      output += String.fromCharCode(255 & (bs >> ((-2 * bc) & 6)));
+    }
+  }
+  return output;
+}
+
+export const isJwtTokenExpired = (token: string | null | undefined): boolean => {
+  if (!token || typeof token !== 'string') return true;
+  const parts = token.trim().split('.');
+  if (parts.length !== 3) return true;
+  try {
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const jsonStr = typeof atob === 'function' ? atob(base64) : decodeBase64Url(base64);
+    const payload = JSON.parse(jsonStr);
+    if (typeof payload?.exp === 'number' && payload.exp * 1000 <= Date.now()) {
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+};
+
 /**
- * Checks whether a given string is a genuine base64-encoded JWT token
+ * Checks whether a given string is a genuine, non-expired JWT token.
  */
 export const isJwtToken = (token: string | null | undefined): boolean => {
   if (!token || typeof token !== 'string') return false;
   const trimmed = token.trim();
-  return trimmed.startsWith('ey') && trimmed.split('.').length === 3;
+  if (!trimmed.startsWith('ey') || trimmed.split('.').length !== 3) return false;
+  return !isJwtTokenExpired(trimmed);
 };
 
 class ApiClient {
@@ -47,14 +81,11 @@ class ApiClient {
       (error) => Promise.reject(error)
     );
 
-    // Response Interceptor: handles token expiration / 401 / 403 gracefully with auto-retry
+    // Response Interceptor: handles token expiration / 401 / 403 cleanly
     this.instance.interceptors.response.use(
       (response: AxiosResponse) => response,
       async (error: any) => {
-        const status = error?.response?.status;
-        const originalConfig = error?.config;
-
-        // The caller must reauthenticate on 401. Never retry a failed request
+        // The caller must reauthenticate on 401/403. Never retry a failed request
         // using a hard-coded worker UUID or replace a valid token with an identity.
         if (error.response) {
           error.status = error.response.status;
@@ -65,6 +96,10 @@ class ApiClient {
         return Promise.reject(error);
       }
     );
+  }
+
+  public hasSignedSession(): boolean {
+    return isJwtToken(this.authToken);
   }
 
   public setAuthToken(token: string | null) {

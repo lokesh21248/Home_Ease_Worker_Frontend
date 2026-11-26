@@ -44,7 +44,8 @@ class WebSocketService {
   private listeners: Set<JobRequestListener> = new Set();
   private currentUserId: string | null = null;
   private currentWorkerId: string | null = null;
-  private subscriptionIds: { [dest: string]: string } = {};
+  private subscribedDestinations: Set<string> = new Set();
+  private recentEventTimestamps: Map<string, number> = new Map();
 
   /**
    * Connect to backend STOMP WebSocket broker with auto endpoint fallback
@@ -55,7 +56,7 @@ class WebSocketService {
     if (workerId) this.currentWorkerId = workerId;
 
     if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) {
-      // If already connected, re-subscribe if workerId was updated
+      // If already connected, subscribe only to any new topics not yet subscribed
       if (this.isConnectedState) {
         this.subscribeToChannels();
       }
@@ -67,6 +68,7 @@ class WebSocketService {
     console.log(`[WebSocketService] Connecting to: ${wsUrl} (candidate ${(this.endpointIndex % candidates.length) + 1}/${candidates.length})`);
 
     try {
+      this.subscribedDestinations.clear();
       this.socket = new WebSocket(wsUrl);
 
       this.socket.onopen = () => {
@@ -88,6 +90,7 @@ class WebSocketService {
       this.socket.onclose = (event) => {
         console.log(`[WebSocketService] Socket closed. Code: ${event.code}, Reason: ${event.reason}`);
         this.isConnectedState = false;
+        this.subscribedDestinations.clear();
         this.cleanupHeartbeat();
         this.endpointIndex++;
         this.scheduleReconnect();
@@ -104,6 +107,7 @@ class WebSocketService {
    */
   disconnect(): void {
     this.isConnectedState = false;
+    this.subscribedDestinations.clear();
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
@@ -133,6 +137,29 @@ class WebSocketService {
     return this.isConnectedState && this.socket?.readyState === WebSocket.OPEN;
   }
 
+  private shouldSkipDuplicateMessage(payload: any): boolean {
+    const id = payload?.bookingId || payload?.id;
+    if (!id) return false;
+
+    const eventType = payload?.type || payload?.status || 'MSG';
+    const key = `${id}:${eventType}`;
+    const now = Date.now();
+
+    // Prune expired keys (> 60s)
+    for (const [k, ts] of this.recentEventTimestamps.entries()) {
+      if (now - ts > 60_000) {
+        this.recentEventTimestamps.delete(k);
+      }
+    }
+
+    const lastSeen = this.recentEventTimestamps.get(key);
+    if (lastSeen && now - lastSeen < 15_000) {
+      return true;
+    }
+    this.recentEventTimestamps.set(key, now);
+    return false;
+  }
+
   private handleIncomingData(data: any): void {
     if (typeof data !== 'string') return;
 
@@ -152,6 +179,9 @@ class WebSocketService {
       } else if (frame.command === 'MESSAGE') {
         try {
           const bodyJson = JSON.parse(frame.body);
+          if (this.shouldSkipDuplicateMessage(bodyJson)) {
+            continue;
+          }
           console.log('[WebSocketService] Incoming message on destination:', frame.headers['destination'], bodyJson);
           this.notifyListeners(bodyJson);
         } catch {
@@ -161,41 +191,40 @@ class WebSocketService {
     }
   }
 
+  private subscribeIfNeeded(id: string, destination: string): boolean {
+    if (this.subscribedDestinations.has(destination)) return false;
+    this.subscribedDestinations.add(destination);
+    this.sendFrame('SUBSCRIBE', {
+      id,
+      destination,
+      ack: 'auto',
+    });
+    return true;
+  }
+
   private subscribeToChannels(): void {
     if (!this.isConnectedState || !this.socket) return;
 
     // Subscribe to userId topic
     if (this.currentUserId) {
       const userDest = `/topic/worker/${this.currentUserId}/requests`;
-      this.sendFrame('SUBSCRIBE', {
-        id: 'sub-user-req',
-        destination: userDest,
-        ack: 'auto',
-      });
       const userStreamDest = `/topic/worker/${this.currentUserId}/stream`;
-      this.sendFrame('SUBSCRIBE', {
-        id: 'sub-user-stream',
-        destination: userStreamDest,
-        ack: 'auto',
-      });
-      console.log('[WebSocketService] Subscribed to:', userDest, userStreamDest);
+      const subA = this.subscribeIfNeeded('sub-user-req', userDest);
+      const subB = this.subscribeIfNeeded('sub-user-stream', userStreamDest);
+      if (subA || subB) {
+        console.log('[WebSocketService] Subscribed to:', userDest, userStreamDest);
+      }
     }
 
     // Subscribe to workerId topic
     if (this.currentWorkerId && this.currentWorkerId !== this.currentUserId) {
       const workerDest = `/topic/worker/${this.currentWorkerId}/requests`;
-      this.sendFrame('SUBSCRIBE', {
-        id: 'sub-worker-req',
-        destination: workerDest,
-        ack: 'auto',
-      });
       const workerStreamDest = `/topic/worker/${this.currentWorkerId}/stream`;
-      this.sendFrame('SUBSCRIBE', {
-        id: 'sub-worker-stream',
-        destination: workerStreamDest,
-        ack: 'auto',
-      });
-      console.log('[WebSocketService] Subscribed to:', workerDest, workerStreamDest);
+      const subA = this.subscribeIfNeeded('sub-worker-req', workerDest);
+      const subB = this.subscribeIfNeeded('sub-worker-stream', workerStreamDest);
+      if (subA || subB) {
+        console.log('[WebSocketService] Subscribed to:', workerDest, workerStreamDest);
+      }
     }
   }
 

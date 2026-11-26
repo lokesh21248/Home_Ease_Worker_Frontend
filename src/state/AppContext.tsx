@@ -21,7 +21,7 @@ import { mockReviewsData, RatingOverview } from '../mock/reviews';
 import { mockNotifications } from '../mock/notifications';
 import { fcmService } from '../services/fcmService';
 import { workerApiService } from '../api/workerApiService';
-import { apiClient } from '../api/client';
+import { apiClient, isJwtToken } from '../api/client';
 import { storageService } from '../services/storageService';
 import { alertFeedbackService } from '../services/alertFeedbackService';
 import { resolveBookingUuid } from '../utils/uuid';
@@ -406,7 +406,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const restorePersistedState = async () => {
       try {
         const authSession = await storageService.loadAuthSession();
-        if (authSession.token && authSession.userId) {
+        if (authSession.token && authSession.userId && isJwtToken(authSession.token)) {
           apiClient.setAuthToken(authSession.token);
           apiClient.setUserId(authSession.userId);
           setIsAuthenticated(true);
@@ -416,9 +416,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           // Fetch live worker profile from backend GET /workers/profile
           await fetchWorkerProfile().catch(() => {});
         } else {
-          const defaultUid = worker?.userId || worker?.id || '1270d52d-9f4e-4399-9a80-15cab07f1763';
+          apiClient.setAuthToken(null);
+          const defaultUid =
+            authSession.userId || worker?.userId || worker?.id || '1270d52d-9f4e-4399-9a80-15cab07f1763';
           apiClient.setUserId(defaultUid);
-          await fetchWorkerProfile().catch(() => {});
+          if (authSession.workerProfile) {
+            setWorker(authSession.workerProfile);
+          }
         }
 
         let restoredJob: Job | null = null;
@@ -471,7 +475,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } finally {
         fetchServicesCatalog();
         fetchAvailabilityData();
-        fetchSchedules();
+        fetchAllScheduleSlots();
         fcmService.getFCMToken().catch(() => {});
       }
     };
@@ -528,13 +532,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let immediateTimer: any;
 
     if (worker.availability.isOnline) {
-      workerApiService.sendLocationHeartbeat(workerLocation.lat, workerLocation.lng).catch(() => {});
-      immediateTimer = setTimeout(() => {
-        fetchJobRequests().catch(() => {});
-      }, 100);
+      if (apiClient.hasSignedSession()) {
+        workerApiService.sendLocationHeartbeat(workerLocation.lat, workerLocation.lng).catch(() => {});
+        immediateTimer = setTimeout(() => {
+          fetchJobRequests().catch(() => {});
+        }, 100);
+      }
 
       // Heartbeat every 20s (contract: 15-30s while online) using genuine device GPS only (no random jitter)
       heartbeatInterval = setInterval(() => {
+        if (!apiClient.hasSignedSession()) return;
         locationService
           .getCurrentLocation(true)
           .then((loc) => {
@@ -546,10 +553,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           .catch(() => {});
       }, 20000);
 
-      // Poll incoming job dispatch requests every 15s
+      // Poll incoming job dispatch requests every 15s (WebSocket handles instant push)
       requestsInterval = setInterval(() => {
+        if (!apiClient.hasSignedSession()) return;
         fetchJobRequests().catch(() => {});
-      }, 4000);
+      }, 15000);
     }
 
     return () => {
@@ -572,25 +580,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const toggleServiceSelection = (serviceId: string) => {
-    setWorker((prev) => {
-      const exists = prev.selectedServices.includes(serviceId);
-      const updated = exists
-        ? prev.selectedServices.filter((id) => id !== serviceId)
-        : [...prev.selectedServices, serviceId];
+    const exists = worker.selectedServices.includes(serviceId);
+    const updated = exists
+      ? worker.selectedServices.filter((id) => id !== serviceId)
+      : [...worker.selectedServices, serviceId];
 
-      const allSelectedSubServiceIds: string[] = [];
-      services.forEach((s) => {
-        if (updated.includes(s.id) && s.subServices) {
-          s.subServices.forEach((sub) => allSelectedSubServiceIds.push(sub.id));
-        }
-      });
-
-      workerApiService
-        .updateWorkerServices(updated, allSelectedSubServiceIds, prev.workingPincodes)
-        .catch(() => {});
-
-      return { ...prev, selectedServices: updated, subServiceIds: allSelectedSubServiceIds };
+    const allSelectedSubServiceIds: string[] = [];
+    services.forEach((s) => {
+      if (updated.includes(s.id) && s.subServices) {
+        s.subServices.forEach((sub) => allSelectedSubServiceIds.push(sub.id));
+      }
     });
+
+    setWorker((prev) => ({
+      ...prev,
+      selectedServices: updated,
+      subServiceIds: allSelectedSubServiceIds,
+    }));
+
+    // Side effect outside state updater so React StrictMode never fires duplicate POST calls
+    if (apiClient.hasSignedSession()) {
+      workerApiService
+        .updateWorkerServices(updated, allSelectedSubServiceIds, worker.workingPincodes)
+        .catch(() => {});
+    }
   };
 
   const updateAvailability = (availability: WorkerProfile['availability']) => {
@@ -602,7 +615,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const cleaned = pincodes
         .map((p) => p.trim())
         .filter((p) => /^\d{6}$/.test(p));
-      await workerApiService.updateWorkerServices(worker.selectedServices, undefined, cleaned);
+      if (apiClient.hasSignedSession()) {
+        await workerApiService.updateWorkerServices(worker.selectedServices, undefined, cleaned);
+      }
       setWorkingPincodes(cleaned);
       setWorker((prev) => ({
         ...prev,

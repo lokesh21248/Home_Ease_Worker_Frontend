@@ -54,13 +54,24 @@ export const JobRequestsScreen: React.FC = () => {
     return true;
   });
 
-  const handleAccept = (job: Job) => {
+  const handleAccept = async (job: Job) => {
     const bookingId = resolveBookingUuid(job.bookingId, job.id);
-    acceptJob(bookingId);
-    navigation.navigate('ActiveJob', {
-      job: { ...job, id: bookingId, bookingId, status: 'accepted' },
-      bookingId,
-    });
+    try {
+      await acceptJob(bookingId);
+      navigation.navigate('ActiveJob', {
+        job: { ...job, id: bookingId, bookingId, status: 'accepted' },
+        bookingId,
+      });
+    } catch (err: any) {
+      if (err?.status === 409 || err?.isConflict) {
+        Alert.alert(
+          'Job Already Accepted',
+          'Another nearby partner accepted this request faster. Stay online — new jobs are coming in!'
+        );
+      } else {
+        Alert.alert('Notice', err?.message || 'Failed to accept booking.');
+      }
+    }
   };
 
   const handleReject = (job: Job) => {

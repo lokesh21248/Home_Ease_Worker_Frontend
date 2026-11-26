@@ -19,12 +19,19 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { useApp } from '../../state/AppContext';
 import { safeGoBack } from '../../utils/navigationHelper';
 import { workerApiService } from '../../api/workerApiService';
+import { apiClient } from '../../api/client';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ServiceSelection'>;
 
 export const ServiceSelectionScreen: React.FC<Props> = ({ navigation, route }) => {
   const isOnboarding = route.params?.isOnboarding ?? false;
   const { services, worker, toggleServiceSelection, updateWorkerProfile } = useApp();
+  const hasSyncedViaToggleRef = React.useRef(false);
+
+  const handleToggleCard = (serviceId: string) => {
+    hasSyncedViaToggleRef.current = true;
+    toggleServiceSelection(serviceId);
+  };
 
   const handleContinue = () => {
     if (worker.selectedServices.length === 0) {
@@ -48,8 +55,12 @@ export const ServiceSelectionScreen: React.FC<Props> = ({ navigation, route }) =
       subServiceIds: subIds,
     });
 
-    // Persist selected service skills to backend
-    workerApiService.updateWorkerServices(worker.selectedServices, subIds).catch(() => {});
+    // Only sync here if user continued directly with defaults without toggling a card first
+    if (!hasSyncedViaToggleRef.current && apiClient.hasSignedSession()) {
+      workerApiService
+        .updateWorkerServices(worker.selectedServices, subIds, worker.workingPincodes)
+        .catch(() => {});
+    }
 
     if (isOnboarding) {
       navigation.navigate('AvailabilitySetup', { isOnboarding: true });
@@ -111,7 +122,7 @@ export const ServiceSelectionScreen: React.FC<Props> = ({ navigation, route }) =
             return (
               <TouchableOpacity
                 key={service.id}
-                onPress={() => toggleServiceSelection(service.id)}
+                onPress={() => handleToggleCard(service.id)}
                 activeOpacity={0.8}
                 style={[styles.serviceCard, isSelected && styles.serviceCardSelected]}
               >

@@ -102,8 +102,9 @@ export const HomeDashboardScreen: React.FC = () => {
     setRefreshing(true);
     await Promise.all([
       fetchJobRequests().catch(() => {}),
-      fetchSchedules().catch(() => {}),
-      typeof fetchAllScheduleSlots === 'function' ? fetchAllScheduleSlots().catch(() => {}) : Promise.resolve(),
+      typeof fetchAllScheduleSlots === 'function'
+        ? fetchAllScheduleSlots().catch(() => {})
+        : fetchSchedules().catch(() => {}),
       refreshLocation().catch(() => {}),
     ]);
     setRefreshing(false);

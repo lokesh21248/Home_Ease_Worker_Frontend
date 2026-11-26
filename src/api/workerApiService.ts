@@ -97,8 +97,9 @@ export interface TrackingCallResult {
  * identity for live location, arrival and PIN, and a fabricated default id must never act for a real partner.
  */
 function signedToken(): string | null {
+  if (!apiClient.hasSignedSession()) return null;
   const t = apiClient.getAuthToken();
-  return typeof t === 'string' && t.trim().split('.').length === 3 ? t.trim() : null;
+  return typeof t === 'string' ? t.trim() : null;
 }
 
 /** A refused or failed tracking / arrival call, carrying the server's stable code and user-safe message. */
@@ -115,7 +116,23 @@ export class TrackingApiError extends Error {
 }
 
 class WorkerApiService {
-  private profilePromise: Promise<any> | null = null;
+  private inFlightRequests = new Map<string, Promise<any>>();
+
+  /**
+   * Deduplicate concurrent identical read requests so simultaneous screen mounts/focuses
+   * reuse a single in-flight promise.
+   */
+  private coalesceRequest<T>(key: string, loader: () => Promise<T>): Promise<T> {
+    const existing = this.inFlightRequests.get(key);
+    if (existing) {
+      return existing as Promise<T>;
+    }
+    const promise = loader().finally(() => {
+      this.inFlightRequests.delete(key);
+    });
+    this.inFlightRequests.set(key, promise);
+    return promise;
+  }
 
   // ==========================================
   // 1. Worker Auth & Registration
@@ -329,11 +346,10 @@ class WorkerApiService {
    * 2.3 Get Worker Profile: GET /workers/profile
    */
   public getWorkerProfile(): Promise<any> {
-    if (this.profilePromise) {
-      return this.profilePromise;
+    if (!apiClient.hasSignedSession()) {
+      return Promise.resolve(null);
     }
-
-    this.profilePromise = (async () => {
+    return this.coalesceRequest('workerProfile', async () => {
       try {
         const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
         const response = await apiClient.get(API_ENDPOINTS.WORKER.PROFILE, {
@@ -352,25 +368,23 @@ class WorkerApiService {
         }
         console.warn('[WorkerApi] getWorkerProfile error:', status, error?.message);
         throw error;
-      } finally {
-        this.profilePromise = null;
       }
-    })();
-
-    return this.profilePromise;
+    });
   }
 
   /**
    * 2.4 Get Active Services Catalog: GET /services
    */
-  public async getServices(): Promise<any[]> {
-    try {
-      const response = await apiClient.get<any[]>(API_ENDPOINTS.WORKER.SERVICES);
-      const data = (response.data as any)?.data ?? response.data;
-      return Array.isArray(data) ? data : [];
-    } catch (error: any) {
-      return [];
-    }
+  public getServices(): Promise<any[]> {
+    return this.coalesceRequest('servicesCatalog', async () => {
+      try {
+        const response = await apiClient.get<any[]>(API_ENDPOINTS.WORKER.SERVICES);
+        const data = (response.data as any)?.data ?? response.data;
+        return Array.isArray(data) ? data : [];
+      } catch (error: any) {
+        return [];
+      }
+    });
   }
 
   /**
@@ -396,6 +410,9 @@ class WorkerApiService {
    * 3.1 Toggle Duty (Go Online / Offline): POST /workers/status
    */
   public async updateDutyStatus(isOnline: boolean, coords?: { lat: number; lng: number }): Promise<DutyStatusResponse> {
+    if (!apiClient.hasSignedSession()) {
+      throw new TrackingApiError('AUTH_REQUIRED', 'Sign in with OTP to sync online duty status with dispatch.', 401);
+    }
     const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
     try {
       const payload: any = {
@@ -442,6 +459,9 @@ class WorkerApiService {
     subServiceIds?: string[],
     workingPincodes?: string[] | string
   ): Promise<any> {
+    if (!apiClient.hasSignedSession()) {
+      throw new TrackingApiError('AUTH_REQUIRED', 'Sign in with OTP to sync services with the live server.', 401);
+    }
     const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
     try {
       const payload: any = {
@@ -474,6 +494,9 @@ class WorkerApiService {
    * 3.2 GPS Location Heartbeat Ping: POST /workers/location & /workers/stream/ping
    */
   public async sendLocationHeartbeat(lat: number, lng: number): Promise<string> {
+    if (!apiClient.hasSignedSession()) {
+      return 'Preview mode location updated locally.';
+    }
     const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
 
     // 1. Stream telemetry ping to /workers/stream/ping (Redis GEO set & 30s TTL heartbeat)
@@ -521,24 +544,32 @@ class WorkerApiService {
   /**
    * 4.0 Get Live Job Dispatch Requests: GET /workers/bookings/requests
    */
-  public async getJobRequests(): Promise<any[]> {
-    const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
-    try {
-      const response = await apiClient.get<any[]>(API_ENDPOINTS.BOOKINGS.REQUESTS, {
-        headers: { 'X-User-Id': activeUserId },
-        params: { userId: activeUserId },
-      });
-      const data = (response.data as any)?.data ?? response.data;
-      return Array.isArray(data) ? data : [];
-    } catch (error: any) {
-      return [];
+  public getJobRequests(): Promise<any[]> {
+    if (!apiClient.hasSignedSession()) {
+      return Promise.resolve([]);
     }
+    return this.coalesceRequest('jobRequests', async () => {
+      const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
+      try {
+        const response = await apiClient.get<any[]>(API_ENDPOINTS.BOOKINGS.REQUESTS, {
+          headers: { 'X-User-Id': activeUserId },
+          params: { userId: activeUserId },
+        });
+        const data = (response.data as any)?.data ?? response.data;
+        return Array.isArray(data) ? data : [];
+      } catch (error: any) {
+        return [];
+      }
+    });
   }
 
   /**
    * 4.0b Get Worker Assigned Bookings: GET /workers/me/jobs
    */
   public async getWorkerJobs(): Promise<any[]> {
+    if (!apiClient.hasSignedSession()) {
+      return [];
+    }
     const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
     try {
       const response = await apiClient.get<any[]>(API_ENDPOINTS.BOOKINGS.JOBS, {
@@ -982,6 +1013,14 @@ class WorkerApiService {
    * 5.1 Get Earnings Overview: GET /workers/earnings
    */
   public async getEarnings(): Promise<EarningsOverviewResponse> {
+    if (!apiClient.hasSignedSession()) {
+      return {
+        totalEarnings: 0,
+        totalCommissionPaid: 0,
+        netPayout: 0,
+        completedBookingsCount: 0,
+      };
+    }
     const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
     try {
       const response = await apiClient.get<any>(API_ENDPOINTS.WORKER.EARNINGS, {
@@ -1010,6 +1049,9 @@ class WorkerApiService {
   // ==========================================
 
   public async updateFcmToken(fcmToken: string): Promise<void> {
+    if (!apiClient.hasSignedSession()) {
+      return;
+    }
     const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
     try {
       await apiClient.post(API_ENDPOINTS.NOTIFICATIONS.UPDATE_FCM_TOKEN, {
@@ -1028,6 +1070,21 @@ class WorkerApiService {
   // ==========================================
 
   public async getWeeklyAvailability(): Promise<DaySchedule[]> {
+    const defaultDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(
+      (dayName, idx) => ({
+        dayOfWeek: idx + 1,
+        dayName,
+        isAvailable: idx < 6,
+        startTime: '08:00',
+        endTime: '20:00',
+        breakStartTime: '13:00',
+        breakEndTime: '14:00',
+        slotDurationMins: 60,
+      })
+    );
+    if (!apiClient.hasSignedSession()) {
+      return defaultDays;
+    }
     const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
     try {
       const response = await apiClient.get<any>(API_ENDPOINTS.WORKER.AVAILABILITY, {
@@ -1037,21 +1094,14 @@ class WorkerApiService {
       const data = (response.data as any)?.data ?? response.data;
       return Array.isArray(data) ? data : [];
     } catch (error: any) {
-      const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-      return days.map((dayName, idx) => ({
-        dayOfWeek: idx + 1,
-        dayName,
-        isAvailable: idx < 6,
-        startTime: '08:00',
-        endTime: '20:00',
-        breakStartTime: '13:00',
-        breakEndTime: '14:00',
-        slotDurationMins: 60,
-      }));
+      return defaultDays;
     }
   }
 
   public async saveWeeklyAvailability(schedule: DaySchedule[]): Promise<any> {
+    if (!apiClient.hasSignedSession()) {
+      return { success: true, preview: true };
+    }
     const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
     try {
       const response = await apiClient.post(
@@ -1069,6 +1119,9 @@ class WorkerApiService {
   }
 
   public async getTimeOff(): Promise<TimeOffItem[]> {
+    if (!apiClient.hasSignedSession()) {
+      return [];
+    }
     const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
     try {
       const response = await apiClient.get<any>(API_ENDPOINTS.WORKER.TIME_OFF, {
@@ -1083,6 +1136,14 @@ class WorkerApiService {
   }
 
   public async addTimeOff(startDate: string, endDate: string, reason?: string): Promise<any> {
+    if (!apiClient.hasSignedSession()) {
+      return {
+        timeOffId: `preview-timeoff-${Date.now()}`,
+        startDate,
+        endDate,
+        reason,
+      };
+    }
     const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
     try {
       const response = await apiClient.post(
@@ -1105,6 +1166,9 @@ class WorkerApiService {
   }
 
   public async deleteTimeOff(id: string): Promise<any> {
+    if (!apiClient.hasSignedSession()) {
+      return { success: true, preview: true };
+    }
     const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
     try {
       const response = await apiClient.delete(API_ENDPOINTS.WORKER.TIME_OFF_DETAIL(id), {
@@ -1117,42 +1181,57 @@ class WorkerApiService {
     }
   }
 
-  public async getTodaySchedule(): Promise<WorkerTodaySchedule> {
-    const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
-    try {
-      const response = await apiClient.get<any>(API_ENDPOINTS.WORKER.SCHEDULE_TODAY, {
-        headers: { 'X-User-Id': activeUserId },
-        params: { userId: activeUserId },
-      });
-      const data = (response.data as any)?.data ?? response.data;
-      return {
-        date: data?.date || new Date().toISOString().split('T')[0],
-        totalJobsToday: Number(data?.totalJobsToday ?? (data?.schedule?.length || 0)),
-        completedCount: Number(data?.completedCount ?? 0),
-        schedule: Array.isArray(data?.schedule) ? data.schedule : [],
-      };
-    } catch (error: any) {
-      return {
+  public getTodaySchedule(): Promise<WorkerTodaySchedule> {
+    if (!apiClient.hasSignedSession()) {
+      return Promise.resolve({
         date: new Date().toISOString().split('T')[0],
         totalJobsToday: 0,
         completedCount: 0,
         schedule: [],
-      };
+      });
     }
+    return this.coalesceRequest('todaySchedule', async () => {
+      const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
+      try {
+        const response = await apiClient.get<any>(API_ENDPOINTS.WORKER.SCHEDULE_TODAY, {
+          headers: { 'X-User-Id': activeUserId },
+          params: { userId: activeUserId },
+        });
+        const data = (response.data as any)?.data ?? response.data;
+        return {
+          date: data?.date || new Date().toISOString().split('T')[0],
+          totalJobsToday: Number(data?.totalJobsToday ?? (data?.schedule?.length || 0)),
+          completedCount: Number(data?.completedCount ?? 0),
+          schedule: Array.isArray(data?.schedule) ? data.schedule : [],
+        };
+      } catch (error: any) {
+        return {
+          date: new Date().toISOString().split('T')[0],
+          totalJobsToday: 0,
+          completedCount: 0,
+          schedule: [],
+        };
+      }
+    });
   }
 
-  public async getUpcomingSchedule(): Promise<WorkerScheduleSlot[]> {
-    const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
-    try {
-      const response = await apiClient.get<any>(API_ENDPOINTS.WORKER.SCHEDULE_UPCOMING, {
-        headers: { 'X-User-Id': activeUserId },
-        params: { userId: activeUserId },
-      });
-      const data = (response.data as any)?.data ?? response.data;
-      return Array.isArray(data) ? data : [];
-    } catch (error: any) {
-      return [];
+  public getUpcomingSchedule(): Promise<WorkerScheduleSlot[]> {
+    if (!apiClient.hasSignedSession()) {
+      return Promise.resolve([]);
     }
+    return this.coalesceRequest('upcomingSchedule', async () => {
+      const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
+      try {
+        const response = await apiClient.get<any>(API_ENDPOINTS.WORKER.SCHEDULE_UPCOMING, {
+          headers: { 'X-User-Id': activeUserId },
+          params: { userId: activeUserId },
+        });
+        const data = (response.data as any)?.data ?? response.data;
+        return Array.isArray(data) ? data : [];
+      } catch (error: any) {
+        return [];
+      }
+    });
   }
 }
 
