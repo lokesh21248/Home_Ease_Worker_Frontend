@@ -64,7 +64,7 @@ const STATUS_LABEL: Record<TrackingStatus['state'], { text: string; color: strin
   IDLE: { text: 'Location sharing off', color: '#6B7280' },
   STARTING: { text: 'Starting GPS...', color: '#6B7280' },
   LIVE: { text: 'Live - customer can see you', color: '#16A34A' },
-  RETRYING: { text: 'No connection - retrying', color: '#D97706' },
+  RETRYING: { text: 'GPS PAUSED - Retrying delivery', color: '#D97706' },
   PERMISSION_DENIED: { text: 'Location permission denied', color: '#DC2626' },
   GPS_DISABLED: { text: 'GPS is switched off', color: '#DC2626' },
   AUTH_REQUIRED: { text: 'Signed out - sign in again', color: '#DC2626' },

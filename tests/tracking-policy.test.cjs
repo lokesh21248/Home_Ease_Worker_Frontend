@@ -264,5 +264,257 @@ test('worker app tracks job.status changes, resumes travelling GPS on relaunch, 
     assert.match(jobsTab, /await\s+acceptJob\(bookingId\)/);
     assert.match(jobDetails, /await\s+acceptJob\(bookingId\)/);
     assert.match(rootLayout, /await\s+acceptJob\(bookingId\)/);
+
+    const navScreen = fs.readFileSync(
+      path.join(ROOT, 'src', 'screens', 'jobs', 'NavigationTrackingScreen.tsx'),
+      'utf8'
+    );
+    assert.match(navScreen, /GPS PAUSED/);
+
+    // Verify no hardcoded fallback user UUID remains in heartbeat or live-tracking / routing methods
+    const heartbeatSection = apiSvc.slice(
+      apiSvc.indexOf('sendLocationHeartbeat('),
+      apiSvc.indexOf('getJobRequests(')
+    );
+    const trackingStart = apiSvc.indexOf('publishLiveLocation(');
+    const trackingEnd = apiSvc.indexOf('getDrivingRoute(') + 1200;
+    const trackingMethodsSection = apiSvc.slice(trackingStart, trackingEnd);
+    assert.doesNotMatch(heartbeatSection, /1270d52d-9f4e-4399-9a80-15cab07f1763/);
+    assert.doesNotMatch(trackingMethodsSection, /1270d52d-9f4e-4399-9a80-15cab07f1763/);
+  });
+
+  function loadTrackingLifecycleModule(mocks) {
+    const lifecyclePath = path.join(ROOT, 'src', 'services', 'TrackingLifecycleManager.ts');
+    const policyPath = path.join(ROOT, 'src', 'services', 'trackingPolicy.ts');
+    const clientPath = path.join(ROOT, 'src', 'api', 'client.ts');
+    const lifecycleSrc = fs.readFileSync(lifecyclePath, 'utf8');
+    const transpiled = ts.transpileModule(lifecycleSrc, {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
+      fileName: lifecyclePath,
+    });
+    const mod = { exports: {} };
+    const localRequire = (specifier) => {
+      if (specifier === '@react-native-async-storage/async-storage') {
+        return { __esModule: true, default: mocks.asyncStorage };
+      }
+      if (specifier === 'expo-location') {
+        return mocks.expoLocation;
+      }
+      if (specifier === 'expo-task-manager') {
+        return mocks.taskManager;
+      }
+      if (specifier === '../api/workerApiService') {
+        return { __esModule: true, default: mocks.workerApiService };
+      }
+      if (specifier === '../api/client') {
+        const clientExports = loadWorkerClientModule();
+        return {
+          ...clientExports,
+          apiClient: mocks.apiClient,
+        };
+      }
+      if (specifier === './storageService') {
+        return { storageService: mocks.storageService };
+      }
+      if (specifier === './trackingPolicy') {
+        return require(policyPath);
+      }
+      return Module.createRequire(clientPath)(specifier);
+    };
+    const fn = vm.runInThisContext(
+      `(function(exports, require, module, __filename, __dirname) { ${transpiled.outputText} \n})`,
+      { filename: lifecyclePath }
+    );
+    fn(mod.exports, localRequire, mod, lifecyclePath, path.dirname(lifecyclePath));
+    return mod.exports;
+  }
+
+  test('TrackingLifecycleManager catches unexpected upload throws, coalesces newer fixes, and retries safely', async () => {
+    const store = new Map();
+    const calls = [];
+    let attempt = 0;
+    const managerMod = loadTrackingLifecycleModule({
+      asyncStorage: {
+        setItem: async (k, v) => { store.set(k, v); },
+        getItem: async (k) => store.get(k) ?? null,
+        removeItem: async (k) => { store.delete(k); },
+      },
+      expoLocation: {
+        Accuracy: { High: 5 },
+        requestForegroundPermissionsAsync: async () => ({ status: 'granted' }),
+        requestBackgroundPermissionsAsync: async () => ({ status: 'granted' }),
+        hasServicesEnabledAsync: async () => true,
+        watchPositionAsync: async () => ({ remove() {} }),
+        hasStartedLocationUpdatesAsync: async () => false,
+        startLocationUpdatesAsync: async () => {},
+        stopLocationUpdatesAsync: async () => {},
+      },
+      taskManager: {
+        isTaskDefined: () => true,
+        defineTask: () => {},
+      },
+      workerApiService: {
+        publishLiveLocation: async (bId, lat, lng, _h, _s, _a, ts) => {
+          attempt += 1;
+          calls.push({ attempt, bId, lat, lng, ts });
+          if (attempt === 1) {
+            throw new Error('ECONNRESET socket hang up');
+          }
+          return { status: 200, data: { status: 'SUCCESS' } };
+        },
+        reportDeviceStatus: async () => ({ status: 200, data: null }),
+        stopTrackingSession: async () => ({ status: 200, data: null }),
+      },
+      apiClient: {
+        hasSignedSession: () => true,
+        getAuthToken: () => makeJwt({ sub: 'w-1', exp: Math.floor(Date.now() / 1000) + 3600 }),
+        setAuthToken: () => {},
+        setUserId: () => {},
+      },
+      storageService: {
+        loadAuthSession: async () => ({ token: null, userId: null }),
+      },
+    });
+
+    const mgr = managerMod.workerTrackingLifecycle;
+    const bookingId = '11111111-1111-4111-8111-111111111111';
+    await mgr.startTravelTracking(bookingId, undefined, undefined, { lat: 17.46, lng: 78.36 });
+
+    const baseTs = Date.now();
+    await mgr.handleGpsFix({ latitude: 17.4401, longitude: 78.3489, accuracy: 8 }, baseTs);
+
+    // After unexpected exception on attempt 1: status is RETRYING and newest fix remains preserved
+    assert.equal(mgr.getStatus().state, 'RETRYING');
+    assert.match(mgr.getStatus().message || '', /GPS PAUSED/);
+    assert.ok(mgr.retryTimer, 'single retry timer should be scheduled');
+    const firstTimer = mgr.retryTimer;
+
+    // A newer fix arrives while waiting for backoff retry: buffer replaces older fix without duplicating timer
+    await mgr.handleGpsFix({ latitude: 17.4425, longitude: 78.3510, accuracy: 6 }, baseTs + 4000);
+    assert.equal(mgr.retryTimer, firstTimer, 'must not allocate duplicate retry timers');
+
+    // Manually trigger retry flush immediately and confirm newest coordinates upload and go LIVE
+    clearTimeout(mgr.retryTimer);
+    mgr.retryTimer = null;
+    await mgr.flush();
+
+    assert.equal(calls.length, 2);
+    assert.equal(calls[1].lat, 17.4425);
+    assert.equal(calls[1].lng, 78.3510);
+    assert.equal(mgr.getStatus().state, 'LIVE');
+
+    await mgr.stopTracking(bookingId, 'STOPPED', false);
+  });
+
+  test('TrackingLifecycleManager stops permanently on 401 AUTH_REQUIRED and 403/409/410 STOP_TRACKING', async () => {
+    for (const [httpStatus, expectedState] of [
+      [401, 'AUTH_REQUIRED'],
+      [403, 'ENDED'],
+      [409, 'ENDED'],
+      [410, 'ENDED'],
+    ]) {
+      const store = new Map();
+      const managerMod = loadTrackingLifecycleModule({
+        asyncStorage: {
+          setItem: async (k, v) => { store.set(k, v); },
+          getItem: async (k) => store.get(k) ?? null,
+          removeItem: async (k) => { store.delete(k); },
+        },
+        expoLocation: {
+          Accuracy: { High: 5 },
+          requestForegroundPermissionsAsync: async () => ({ status: 'granted' }),
+          requestBackgroundPermissionsAsync: async () => ({ status: 'granted' }),
+          hasServicesEnabledAsync: async () => true,
+          watchPositionAsync: async () => ({ remove() {} }),
+          hasStartedLocationUpdatesAsync: async () => false,
+          startLocationUpdatesAsync: async () => {},
+          stopLocationUpdatesAsync: async () => {},
+        },
+        taskManager: { isTaskDefined: () => true, defineTask: () => {} },
+        workerApiService: {
+          publishLiveLocation: async () => ({ status: httpStatus, data: { error: 'stopped' } }),
+          reportDeviceStatus: async () => ({ status: 200, data: null }),
+          stopTrackingSession: async () => ({ status: 200, data: null }),
+        },
+        apiClient: {
+          hasSignedSession: () => true,
+          getAuthToken: () => makeJwt({ sub: 'w-1', exp: Math.floor(Date.now() / 1000) + 3600 }),
+          setAuthToken: () => {},
+          setUserId: () => {},
+        },
+        storageService: { loadAuthSession: async () => ({ token: null, userId: null }) },
+      });
+
+      const mgr = managerMod.workerTrackingLifecycle;
+      const bookingId = '22222222-2222-4222-8222-222222222222';
+      await mgr.startTravelTracking(bookingId);
+      await mgr.handleGpsFix({ latitude: 17.44, longitude: 78.35, accuracy: 6 }, Date.now());
+      assert.equal(mgr.getStatus().state, expectedState, `HTTP ${httpStatus} should stop cleanly`);
+      assert.equal(mgr.retryTimer, null, `HTTP ${httpStatus} must never leave a retry timer`);
+      await mgr.stopTracking(bookingId, 'STOPPED', false);
+    }
+  });
+
+  test('TrackingLifecycleManager restores signed JWT + booking in headless background task and rejects missing JWT', async () => {
+    const bookingId = '33333333-3333-4333-8333-333333333333';
+    const validJwt = makeJwt({ sub: 'worker-uuid-1', exp: Math.floor(Date.now() / 1000) + 3600 });
+    const store = new Map([
+      ['@homeease/live-tracking/active-booking', bookingId],
+      ['@homeease/live-tracking/active-destination', JSON.stringify({ lat: 17.46, lng: 78.36 })],
+    ]);
+    let signed = false;
+    let restoredToken = null;
+    let restoredUserId = null;
+    const uploads = [];
+
+    const managerMod = loadTrackingLifecycleModule({
+      asyncStorage: {
+        setItem: async (k, v) => { store.set(k, v); },
+        getItem: async (k) => store.get(k) ?? null,
+        removeItem: async (k) => { store.delete(k); },
+      },
+      expoLocation: {
+        Accuracy: { High: 5 },
+        requestForegroundPermissionsAsync: async () => ({ status: 'granted' }),
+        requestBackgroundPermissionsAsync: async () => ({ status: 'granted' }),
+        hasServicesEnabledAsync: async () => true,
+        watchPositionAsync: async () => ({ remove() {} }),
+        hasStartedLocationUpdatesAsync: async () => false,
+        startLocationUpdatesAsync: async () => {},
+        stopLocationUpdatesAsync: async () => {},
+      },
+      taskManager: { isTaskDefined: () => true, defineTask: () => {} },
+      workerApiService: {
+        publishLiveLocation: async (bId, lat, lng) => {
+          uploads.push({ bId, lat, lng });
+          return { status: 200, data: { status: 'SUCCESS' } };
+        },
+        reportDeviceStatus: async () => ({ status: 200, data: null }),
+        stopTrackingSession: async () => ({ status: 200, data: null }),
+      },
+      apiClient: {
+        hasSignedSession: () => signed,
+        getAuthToken: () => restoredToken,
+        setAuthToken: (t) => { restoredToken = t; signed = true; },
+        setUserId: (u) => { restoredUserId = u; },
+      },
+      storageService: {
+        loadAuthSession: async () => ({ token: validJwt, userId: 'worker-uuid-1' }),
+      },
+    });
+
+    const mgr = managerMod.workerTrackingLifecycle;
+    await mgr.handleBackgroundGpsPoint({
+      coords: { latitude: 17.445, longitude: 78.352, accuracy: 7, heading: 90, speed: 5 },
+      timestamp: Date.now(),
+    });
+
+    assert.equal(restoredToken, validJwt);
+    assert.equal(restoredUserId, 'worker-uuid-1');
+    assert.equal(uploads.length, 1);
+    assert.equal(uploads[0].bId, bookingId);
+    assert.equal(mgr.getStatus().state, 'LIVE');
+
+    await mgr.stopTracking(bookingId, 'STOPPED', false);
   });
 })();

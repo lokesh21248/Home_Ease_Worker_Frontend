@@ -497,7 +497,10 @@ class WorkerApiService {
     if (!apiClient.hasSignedSession()) {
       return 'Preview mode location updated locally.';
     }
-    const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
+    const activeUserId = apiClient.getUserId();
+    if (!activeUserId) {
+      return 'Signed session required.';
+    }
 
     // 1. Stream telemetry ping to /workers/stream/ping (Redis GEO set & 30s TTL heartbeat)
     apiClient.post(
@@ -701,6 +704,10 @@ class WorkerApiService {
   }
 
   private async bookingTransition(bookingId: string, path: string): Promise<any> {
+    const resolvedBookingId = resolveBookingUuid(bookingId);
+    if (!resolvedBookingId) {
+      throw new TrackingApiError('BAD_REQUEST', 'Invalid or missing booking ID.', 400);
+    }
     const token = signedToken();
     if (!token) {
       throw new TrackingApiError('JWT_REQUIRED', 'Your session has expired. Please sign in again.', 401);
@@ -739,6 +746,9 @@ class WorkerApiService {
     timestamp: number = Date.now()
   ): Promise<TrackingCallResult> {
     const resolvedBookingId = resolveBookingUuid(bookingId);
+    if (!resolvedBookingId) {
+      return { status: 400, data: { error: 'bookingId is required for GPS upload' } };
+    }
     const token = signedToken();
     if (!token) {
       console.warn(`[Tracking] GPS upload skipped for ${resolvedBookingId}: 401 (no signed JWT)`);
@@ -779,6 +789,9 @@ class WorkerApiService {
   public async stopTrackingSession(bookingId: string, reason: string = 'STOPPED'): Promise<TrackingCallResult> {
     const resolvedBookingId = resolveBookingUuid(bookingId);
     this.loggedFirstFixForBooking.delete(resolvedBookingId);
+    if (!resolvedBookingId) {
+      return { status: 400, data: { error: 'bookingId is required for GPS upload' } };
+    }
     const token = signedToken();
     if (!token) return { status: 401, data: null };
     try {
@@ -804,6 +817,9 @@ class WorkerApiService {
     state: 'OK' | 'PERMISSION_DENIED' | 'GPS_DISABLED'
   ): Promise<TrackingCallResult> {
     const resolvedBookingId = resolveBookingUuid(bookingId);
+    if (!resolvedBookingId) {
+      return { status: 400, data: { error: 'bookingId is required for GPS upload' } };
+    }
     const token = signedToken();
     if (!token) return { status: 401, data: null };
     try {
@@ -830,6 +846,9 @@ class WorkerApiService {
     reason: 'INITIAL' | 'PERIODIC' | 'OFF_ROUTE' = 'PERIODIC'
   ): Promise<TrackingCallResult> {
     const resolvedBookingId = resolveBookingUuid(bookingId);
+    if (!resolvedBookingId) {
+      return { status: 400, data: { error: 'bookingId is required for GPS upload' } };
+    }
     const token = signedToken();
     if (!token) return { status: 401, data: null };
     try {
@@ -853,23 +872,21 @@ class WorkerApiService {
     customerLng: number
   ): Promise<{ distanceKm: number; etaMinutes: number } | null> {
     const resolvedBookingId = resolveBookingUuid(bookingId);
-    const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
-    const authToken = apiClient.getAuthToken();
+    const token = signedToken();
+    if (!token || !resolvedBookingId) {
+      return null;
+    }
     try {
       const url = `${BASE_TRACKING_URL}${API_ENDPOINTS.TRACKING.DISTANCE}`;
-      const headers: Record<string, string> = {
-        'X-User-Id': activeUserId,
-      };
-      if (authToken) {
-        headers['Authorization'] = `Bearer ${authToken}`;
-      }
       const response = await axios.get(url, {
         params: {
           bookingId: resolvedBookingId,
           customerLat,
           customerLng,
         },
-        headers,
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
         timeout: 5000,
       });
       const data = response.data;
@@ -895,16 +912,12 @@ class WorkerApiService {
     destLat: number,
     destLng: number
   ): Promise<{ coordinates: [number, number][]; distanceText?: string; durationText?: string } | null> {
-    const activeUserId = apiClient.getUserId() || '1270d52d-9f4e-4399-9a80-15cab07f1763';
-    const authToken = apiClient.getAuthToken();
+    const token = signedToken();
+    if (!token) {
+      return null;
+    }
     try {
       const url = `${BASE_TRACKING_URL}${API_ENDPOINTS.TRACKING.ROUTE}`;
-      const headers: Record<string, string> = {
-        'X-User-Id': activeUserId,
-      };
-      if (authToken) {
-        headers['Authorization'] = `Bearer ${authToken}`;
-      }
       const response = await axios.get(url, {
         params: {
           startLat,
@@ -912,7 +925,9 @@ class WorkerApiService {
           destLat,
           destLng,
         },
-        headers,
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
         timeout: 6000,
       });
       const data = response.data;

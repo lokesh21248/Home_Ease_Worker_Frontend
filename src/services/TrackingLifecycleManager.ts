@@ -33,6 +33,7 @@ import {
 
 export const BACKGROUND_TRACKING_TASK = 'HOMEEASE_WORKER_BACKGROUND_LOCATION';
 const ACTIVE_BOOKING_KEY = '@homeease/live-tracking/active-booking';
+const ACTIVE_DEST_KEY = '@homeease/live-tracking/active-destination';
 
 export interface WorkerLocationFrame {
   latitude: number;
@@ -180,6 +181,11 @@ class WorkerTrackingLifecycleManager {
     this.setStatus({ state: 'STARTING', bookingId, lastFixAt: null, lastUploadAt: null, message: undefined });
     try {
       await AsyncStorage.setItem(ACTIVE_BOOKING_KEY, bookingId);
+      if (dest) {
+        await AsyncStorage.setItem(ACTIVE_DEST_KEY, JSON.stringify(dest));
+      } else {
+        await AsyncStorage.removeItem(ACTIVE_DEST_KEY);
+      }
     } catch {
       // persistence is best effort
     }
@@ -251,8 +257,7 @@ class WorkerTrackingLifecycleManager {
     this.destination = null;
     this.onLocationCallback = null;
     this.buffer.clear();
-    if (this.retryTimer) clearTimeout(this.retryTimer);
-    this.retryTimer = null;
+    this.clearRetryTimer();
     if (this.gpsWatchdog) clearInterval(this.gpsWatchdog);
     this.gpsWatchdog = null;
     try {
@@ -270,6 +275,7 @@ class WorkerTrackingLifecycleManager {
     }
     try {
       await AsyncStorage.removeItem(ACTIVE_BOOKING_KEY);
+      await AsyncStorage.removeItem(ACTIVE_DEST_KEY);
     } catch {
       // ignore
     }
@@ -290,30 +296,49 @@ class WorkerTrackingLifecycleManager {
     if (!location?.coords) return;
 
     // Android may re-create the JS runtime to deliver a headless location task.
-    // The API singleton then starts with no JWT even though the partner's session
-    // was saved on login. Recover the genuine stored JWT before GPS upload.
-    if (!apiClient.getAuthToken()) {
-      const session = await storageService.loadAuthSession();
-      if (!isJwtToken(session.token)) {
-        this.setStatus({ state: 'AUTH_REQUIRED', message: 'Sign in again to resume location sharing.' });
-        return;
-      }
-      apiClient.setAuthToken(session.token!.trim());
-      if (session.userId) apiClient.setUserId(session.userId);
-    }
-
-    if (!this.activeBookingId) {
-      try {
-        const restored = await AsyncStorage.getItem(ACTIVE_BOOKING_KEY);
-        if (restored) {
-          this.activeBookingId = restored;
-          this.setStatus({ state: 'STARTING', bookingId: restored });
+    // The API singleton then starts with no signed JWT even though the partner's
+    // session was saved on login. Recover the genuine stored JWT before GPS upload.
+    try {
+      if (!apiClient.hasSignedSession()) {
+        const session = await storageService.loadAuthSession();
+        if (!isJwtToken(session.token)) {
+          this.setStatus({ state: 'AUTH_REQUIRED', message: 'Sign in again to resume location sharing.' });
+          return;
         }
-      } catch {
-        // ignore
+        apiClient.setAuthToken(session.token!.trim());
+        if (session.userId) apiClient.setUserId(session.userId);
       }
+
+      if (!this.activeBookingId) {
+        try {
+          const restored = await AsyncStorage.getItem(ACTIVE_BOOKING_KEY);
+          if (restored) {
+            this.activeBookingId = restored;
+            this.setStatus({ state: 'STARTING', bookingId: restored });
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      if (!this.destination) {
+        try {
+          const rawDest = await AsyncStorage.getItem(ACTIVE_DEST_KEY);
+          if (rawDest) {
+            const parsed = JSON.parse(rawDest);
+            if (typeof parsed?.lat === 'number' && typeof parsed?.lng === 'number') {
+              this.destination = { lat: parsed.lat, lng: parsed.lng };
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      await this.handleGpsFix(location.coords, location.timestamp || Date.now());
+    } catch (e: any) {
+      console.warn('[TrackingLifecycle] background fix handling failed:', e?.message || e);
     }
-    await this.handleGpsFix(location.coords, location.timestamp || Date.now());
   }
 
   /** Accepts a device fix, notifies the screen, and uploads it when the adaptive policy says so. */
@@ -374,11 +399,21 @@ class WorkerTrackingLifecycleManager {
     if (!this.retryTimer) await this.flush();
   }
 
+  private clearRetryTimer(): void {
+    if (this.retryTimer) {
+      clearTimeout(this.retryTimer);
+      this.retryTimer = null;
+    }
+  }
+
   private async flush(): Promise<void> {
     const bookingId = this.activeBookingId;
     if (!bookingId || this.uploading) return;
     const fix = this.buffer.take(Date.now());
-    if (!fix) return;
+    if (!fix) {
+      this.clearRetryTimer();
+      return;
+    }
 
     this.uploading = true;
     let outcome: UploadOutcome = 'RETRY';
@@ -396,21 +431,39 @@ class WorkerTrackingLifecycleManager {
       if (outcome !== 'OK' && outcome !== 'RETRY') {
         console.warn('[TrackingLifecycle] upload', res.status, res.data?.message || res.data?.error || '');
       }
+    } catch (err: any) {
+      console.warn('[TrackingLifecycle] upload exception; preserving latest fix for retry:', err?.message || err);
+      outcome = 'RETRY';
     } finally {
       this.uploading = false;
     }
 
+    // If tracking stopped or switched bookings while the HTTP request was in flight, do not mutate state or spin timers.
+    if (this.activeBookingId !== bookingId) {
+      return;
+    }
+
     switch (outcome) {
       case 'OK':
+        this.clearRetryTimer();
         this.retryAttempt = 0;
         this.lastSent = fix;
         this.lastSentAt = Date.now();
         this.setStatus({ state: 'LIVE', lastUploadAt: this.lastSentAt, message: undefined });
+        if (this.buffer.peek()) {
+          void this.flush();
+        }
         return;
       case 'DROP_FRAME':
+        this.clearRetryTimer();
+        this.retryAttempt = 0;
         this.lastSentAt = Date.now();
+        if (this.buffer.peek()) {
+          void this.flush();
+        }
         return;
       case 'AUTH_REQUIRED':
+        this.clearRetryTimer();
         await this.stopTracking(bookingId, 'STOPPED', false);
         this.setStatus({
           state: 'AUTH_REQUIRED',
@@ -419,13 +472,15 @@ class WorkerTrackingLifecycleManager {
         return;
       case 'STOP_TRACKING':
         // arrived, cancelled, or this partner is no longer assigned: the server already closed the session
+        this.clearRetryTimer();
         await this.stopTracking(bookingId, 'STOPPED', false);
         return;
       default: {
         // RETRY: keep the newest fix (a newer one may replace it meanwhile) and back off
         this.buffer.offer(fix);
+        this.clearRetryTimer();
         const wait = nextBackoffMs(this.retryAttempt++);
-        this.setStatus({ state: 'RETRYING', message: 'Connection problem. Retrying...' });
+        this.setStatus({ state: 'RETRYING', message: 'GPS PAUSED - Retrying delivery...' });
         this.retryTimer = setTimeout(() => {
           this.retryTimer = null;
           void this.flush();
