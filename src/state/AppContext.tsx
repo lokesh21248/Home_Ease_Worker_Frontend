@@ -273,6 +273,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // GPS Location Stream (matches backend POST /workers/location)
+  const hasRealGpsFixRef = React.useRef(false);
   const [workerLocation, setWorkerLocation] = useState<{ lat: number; lng: number }>({
     lat: 17.447812,
     lng: 78.373954,
@@ -390,6 +391,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const loc = await locationService.getCurrentLocation();
       if (loc) {
+        hasRealGpsFixRef.current = true;
         setLocationData(loc);
         setWorkerLocation({ lat: loc.latitude, lng: loc.longitude });
         await workerApiService.updateLiveLocation(loc.latitude, loc.longitude);
@@ -484,6 +486,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Initialize current location silently
     locationService.getCurrentLocation().then((loc) => {
       if (loc) {
+        hasRealGpsFixRef.current = true;
         setLocationData(loc);
         setWorkerLocation({ lat: loc.latitude, lng: loc.longitude });
       }
@@ -533,7 +536,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (worker.availability.isOnline) {
       if (apiClient.hasSignedSession()) {
-        workerApiService.sendLocationHeartbeat(workerLocation.lat, workerLocation.lng).catch(() => {});
+        if (hasRealGpsFixRef.current) {
+          workerApiService.sendLocationHeartbeat(workerLocation.lat, workerLocation.lng).catch(() => {});
+        } else {
+          locationService
+            .getCurrentLocation(true)
+            .then((loc) => {
+              if (!loc) return;
+              hasRealGpsFixRef.current = true;
+              const next = { lat: loc.latitude, lng: loc.longitude };
+              setWorkerLocation(next);
+              workerApiService.sendLocationHeartbeat(next.lat, next.lng).catch(() => {});
+            })
+            .catch(() => {});
+        }
         immediateTimer = setTimeout(() => {
           fetchJobRequests().catch(() => {});
         }, 100);
@@ -546,6 +562,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           .getCurrentLocation(true)
           .then((loc) => {
             if (!loc) return;
+            hasRealGpsFixRef.current = true;
             const next = { lat: loc.latitude, lng: loc.longitude };
             setWorkerLocation(next);
             workerApiService.sendLocationHeartbeat(next.lat, next.lng).catch(() => {});
@@ -652,21 +669,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // 2. Perform backend update and GPS sync asynchronously
     try {
-      let coords = {
-        lat: locationData?.latitude || 17.447812,
-        lng: locationData?.longitude || 78.373954,
-      };
+      let coords: { lat: number; lng: number } | undefined;
 
       if (nextStatus) {
-        // Request/check permission and get fresh location in background without blocking toggle
-        locationService.checkPermission().then(async (hasPerm) => {
-          if (!hasPerm) locationService.requestPermission().catch(() => {});
-          const loc = await locationService.getCurrentLocation(true).catch(() => null);
-          if (loc) {
-            setLocationData(loc);
-            setWorkerLocation({ lat: loc.latitude, lng: loc.longitude });
+        // Request/check permission and get fresh location synchronously only if cached/quick, without dummy Madhapur fallback
+        const hasPerm = await locationService.checkPermission().catch(() => false);
+        if (!hasPerm) {
+          await locationService.requestPermission().catch(() => false);
+        }
+        const realLoc = await locationService.getCurrentLocation(true).catch(() => null);
+        if (realLoc) {
+          hasRealGpsFixRef.current = true;
+          coords = { lat: realLoc.latitude, lng: realLoc.longitude };
+          setLocationData(realLoc);
+          setWorkerLocation(coords);
+        } else {
+          const cached = locationService.getLastKnownLocation();
+          if (cached && hasRealGpsFixRef.current) {
+            coords = { lat: cached.latitude, lng: cached.longitude };
           }
-        }).catch(() => {});
+        }
       }
 
       const res = await workerApiService.updateDutyStatus(nextStatus, coords);

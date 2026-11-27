@@ -650,9 +650,10 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
       <View style={styles.footer}>
         {currentJob.status === 'accepted' && (
           <PrimaryButton
-            title="Start Travelling to Customer"
+            title={isStartingTravel ? 'Starting Trip...' : 'Start Travelling to Customer'}
             size="lg"
             fullWidth
+            loading={isStartingTravel}
             onPress={handleStartTravelling}
             icon={<Ionicons name="bicycle-outline" size={20} color="#FFFFFF" />}
           />
@@ -661,12 +662,19 @@ export const ActiveJobScreen: React.FC<Props> = ({ navigation, route }) => {
         {currentJob.status === 'travelling' && (
           <View style={{ gap: spacing.sm, width: '100%' }}>
             <PrimaryButton
-              title="I Have Arrived at Location"
+              title={isArriving ? 'Confirming Arrival...' : 'I Have Arrived at Location'}
               size="lg"
               fullWidth
               loading={isArriving}
               onPress={handleMarkArrived}
               icon={<Ionicons name="location-outline" size={20} color="#FFFFFF" />}
+            />
+            <SecondaryButton
+              title="Open Live Navigation Map"
+              size="lg"
+              fullWidth
+              onPress={() => navigation.navigate('NavigationTracking', { job: currentJob })}
+              icon={<Ionicons name="map-outline" size={20} color={colors.primary} />}
             />
             <SecondaryButton
               title="Directions (Google Maps)"

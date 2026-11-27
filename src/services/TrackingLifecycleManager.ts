@@ -17,7 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import workerApiService from '../api/workerApiService';
-import { apiClient } from '../api/client';
+import { apiClient, isJwtToken } from '../api/client';
 import { storageService } from './storageService';
 import {
   LatestFixBuffer,
@@ -294,11 +294,11 @@ class WorkerTrackingLifecycleManager {
     // was saved on login. Recover the genuine stored JWT before GPS upload.
     if (!apiClient.getAuthToken()) {
       const session = await storageService.loadAuthSession();
-      if (!session.token || session.token.split('.').length !== 3) {
+      if (!isJwtToken(session.token)) {
         this.setStatus({ state: 'AUTH_REQUIRED', message: 'Sign in again to resume location sharing.' });
         return;
       }
-      apiClient.setAuthToken(session.token);
+      apiClient.setAuthToken(session.token!.trim());
       if (session.userId) apiClient.setUserId(session.userId);
     }
 

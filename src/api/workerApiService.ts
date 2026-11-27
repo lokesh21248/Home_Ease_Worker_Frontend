@@ -1,5 +1,5 @@
 import axios from 'axios';
-import apiClient from './client';
+import apiClient, { isJwtToken } from './client';
 import { API_ENDPOINTS, BASE_API_URL, BASE_TRACKING_URL } from './endpoints';
 import { resolveBookingUuid, isValidUuid } from '../utils/uuid';
 import { DaySchedule, TimeOffItem, WorkerScheduleSlot, WorkerTodaySchedule } from '../types';
@@ -99,7 +99,7 @@ export interface TrackingCallResult {
 function signedToken(): string | null {
   if (!apiClient.hasSignedSession()) return null;
   const t = apiClient.getAuthToken();
-  return typeof t === 'string' ? t.trim() : null;
+  return typeof t === 'string' && isJwtToken(t) ? t.trim() : null;
 }
 
 /** A refused or failed tracking / arrival call, carrying the server's stable code and user-safe message. */

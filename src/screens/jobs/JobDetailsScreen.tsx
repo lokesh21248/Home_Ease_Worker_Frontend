@@ -30,6 +30,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const { job } = route.params;
   const { acceptJob, rejectJob } = useApp();
   const [liveBooking, setLiveBooking] = useState<any>(null);
+  const [isAccepting, setIsAccepting] = useState(false);
 
   useEffect(() => {
     const bookingUuid = resolveBookingUuid(job.bookingId, job.id);
@@ -43,13 +44,24 @@ export const JobDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
       .catch(() => {});
   }, [job]);
 
-  const handleAccept = () => {
+  const handleAccept = async () => {
+    if (isAccepting) return;
+    setIsAccepting(true);
     const bookingId = resolveBookingUuid(job.bookingId, job.id);
-    acceptJob(bookingId);
-    navigation.navigate('ActiveJob', {
-      job: { ...job, bookingId, status: 'accepted' },
-      bookingId,
-    });
+    try {
+      await acceptJob(bookingId);
+      navigation.navigate('ActiveJob', {
+        job: { ...job, bookingId, status: 'accepted' },
+        bookingId,
+      });
+    } catch (err: any) {
+      Alert.alert(
+        'Could not accept job',
+        err?.response?.data?.message || err?.message || 'This booking is no longer available.'
+      );
+    } finally {
+      setIsAccepting(false);
+    }
   };
 
   const handleReject = () => {
@@ -299,8 +311,9 @@ export const JobDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
               textStyle={{ color: colors.danger }}
             />
             <PrimaryButton
-              title="Accept & Start"
+              title={isAccepting ? 'Accepting...' : 'Accept & Start'}
               size="lg"
+              loading={isAccepting}
               onPress={handleAccept}
               style={styles.acceptBtn}
               icon={<Ionicons name="checkmark-circle-outline" size={18} color="#FFFFFF" />}

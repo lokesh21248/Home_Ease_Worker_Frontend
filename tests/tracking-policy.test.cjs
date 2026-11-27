@@ -164,3 +164,105 @@ test('worker app tracks job.status changes, resumes travelling GPS on relaunch, 
     'ActiveJobScreen must never bypass server PIN verification',
   );
 });
+
+
+;(() => {
+  const { test } = require('node:test');
+  const assert = require('node:assert/strict');
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const Module = require('node:module');
+  const vm = require('node:vm');
+  const ts = require('typescript');
+
+  const ROOT = path.resolve(__dirname, '..');
+
+  function loadWorkerClientModule() {
+    const clientPath = path.join(ROOT, 'src', 'api', 'client.ts');
+    const source = fs.readFileSync(clientPath, 'utf8');
+    const transpiled = ts.transpileModule(source, {
+      compilerOptions: {
+        module: ts.ModuleKind.CommonJS,
+        target: ts.ScriptTarget.ES2020,
+        esModuleInterop: true,
+      },
+      fileName: clientPath,
+    });
+
+    const mod = { exports: {} };
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const localRequire = (specifier) => {
+      if (specifier === '../utils/uuid') {
+        return { isValidUuid: (v) => typeof v === 'string' && uuidRegex.test(v.trim()) };
+      }
+      if (specifier === './endpoints') {
+        return { BASE_API_URL: 'https://example.invalid' };
+      }
+      if (specifier === 'axios') {
+        return {
+          create: () => ({
+            interceptors: {
+              request: { use() {} },
+              response: { use() {} },
+            },
+          }),
+        };
+      }
+      return Module.createRequire(clientPath)(specifier);
+    };
+
+    const fn = vm.runInThisContext(
+      `(function(exports, require, module, __filename, __dirname) { ${transpiled.outputText} \n})`,
+      { filename: clientPath }
+    );
+    fn(mod.exports, localRequire, mod, clientPath, path.dirname(clientPath));
+    return mod.exports;
+  }
+
+  function makeJwt(payloadObj) {
+    const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+    const payload = Buffer.from(JSON.stringify(payloadObj)).toString('base64url');
+    return `${header}.${payload}.fakesignature`;
+  }
+
+  test('isJwtToken rejects expired, bare-UUID, and malformed tokens while accepting unexpired JWTs', () => {
+    const { isJwtToken, isJwtTokenExpired } = loadWorkerClientModule();
+    const nowSec = Math.floor(Date.now() / 1000);
+
+    const validJwt = makeJwt({ sub: '0d3dd87e-2cc0-46a9-9177-8e5a541a36e9', exp: nowSec + 3600 });
+    const expiredJwt = makeJwt({ sub: '0d3dd87e-2cc0-46a9-9177-8e5a541a36e9', exp: nowSec - 120 });
+    const uuidToken = '0d3dd87e-2cc0-46a9-9177-8e5a541a36e9';
+
+    assert.equal(isJwtToken(validJwt), true);
+    assert.equal(isJwtTokenExpired(validJwt), false);
+
+    assert.equal(isJwtToken(expiredJwt), false);
+    assert.equal(isJwtTokenExpired(expiredJwt), true);
+
+    assert.equal(isJwtToken(uuidToken), false);
+    assert.equal(isJwtToken(''), false);
+    assert.equal(isJwtToken(null), false);
+    assert.equal(isJwtToken(undefined), false);
+    assert.equal(isJwtToken('not.a.jwt.with.four.parts'), false);
+  });
+
+  test('workerApiService signedToken delegates to isJwtToken and ActiveJobScreen links to NavigationTracking', () => {
+    const apiSvc = fs.readFileSync(path.join(ROOT, 'src', 'api', 'workerApiService.ts'), 'utf8');
+    const activeJobScreen = fs.readFileSync(path.join(ROOT, 'src', 'screens', 'jobs', 'ActiveJobScreen.tsx'), 'utf8');
+    const appCtx = fs.readFileSync(path.join(ROOT, 'src', 'state', 'AppContext.tsx'), 'utf8');
+    const jobsTab = fs.readFileSync(path.join(ROOT, 'src', 'screens', 'jobs', 'JobsTabScreen.tsx'), 'utf8');
+    const jobDetails = fs.readFileSync(path.join(ROOT, 'src', 'screens', 'jobs', 'JobDetailsScreen.tsx'), 'utf8');
+    const rootLayout = fs.readFileSync(path.join(ROOT, 'app', '_layout.tsx'), 'utf8');
+
+    assert.match(apiSvc, /function\s+signedToken[\s\S]*isJwtToken\(t\)/);
+    assert.match(activeJobScreen, /navigate\(['"]NavigationTracking['"]/);
+
+    assert.match(appCtx, /hasRealGpsFixRef\s*=\s*React\.useRef\(false\)/);
+    assert.doesNotMatch(appCtx, /locationData\?\.latitude\s*\|\|\s*17\.447812/);
+    assert.doesNotMatch(appCtx, /locationData\?\.longitude\s*\|\|\s*78\.373954/);
+
+    assert.match(jobsTab, /await\s+acceptJob\(bookingId\)/);
+    assert.match(jobDetails, /await\s+acceptJob\(bookingId\)/);
+    assert.match(rootLayout, /await\s+acceptJob\(bookingId\)/);
+  });
+})();

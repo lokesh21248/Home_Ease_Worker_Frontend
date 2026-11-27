@@ -22,13 +22,17 @@ function RootLayoutContent() {
   // Show modal for the most recent incoming request
   const currentLead = jobRequests.length > 0 ? jobRequests[0] : null;
 
-  const handleAccept = (job: Job) => {
+  const handleAccept = async (job: Job) => {
     const bookingId = resolveBookingUuid(job.bookingId, job.id);
-    acceptJob(bookingId);
-    router.push({
-      pathname: '/jobs/active',
-      params: { bookingId, jobId: job.jobId },
-    });
+    try {
+      await acceptJob(bookingId);
+      router.push({
+        pathname: '/jobs/active',
+        params: { bookingId, jobId: job.jobId },
+      });
+    } catch {
+      // AppContext already surfaces conflict/auth feedback and preserves jobRequests.
+    }
   };
 
   const handleReject = (job: Job) => {
