@@ -1139,8 +1139,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // travelling while an unawaited API call could fail (401/403/409/500) silently.
     // A customer then remained on STANDBY while the worker believed travel had started.
     if (newStatus === 'travelling' && activeJob.status !== 'travelling') {
-      const currentWorkerId = worker.id || worker.userId;
-      if (activeJob.workerId && currentWorkerId && activeJob.workerId !== currentWorkerId) {
+      const assignedMatchesWorker =
+        !activeJob.workerId ||
+        (!worker.id && !worker.userId) ||
+        activeJob.workerId === worker.id ||
+        activeJob.workerId === worker.userId;
+      if (!assignedMatchesWorker) {
         throw new Error('This booking is not assigned to your account.');
       }
       await workerApiService.startTravelling(bId);
